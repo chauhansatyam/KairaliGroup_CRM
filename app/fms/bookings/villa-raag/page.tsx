@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useActiveVillaBookings } from "@/hooks/use-active-bookings";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,8 +45,6 @@ import {
   Building2,
   Globe,
   PauseCircle,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react"
 import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -80,7 +80,7 @@ interface Booking {
   totalAmount?: string
   paidAmount?: string
 }
-
+/* sample data for testing
 const sampleBookings: Booking[] = [
   {
     id: "1",
@@ -179,9 +179,12 @@ const sampleBookings: Booking[] = [
     paidAmount: "165000",
   },
 ]
+*/
 
 export default function VillaRaagBookingPage() {
-  const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
+  //const [bookings, setBookings] = useState<Booking[]>(sampleBookings)
+   const tableRef = useRef<HTMLDivElement | null>(null)
+  const { bookings, loading, error } = useActiveVillaBookings();
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [teamFilter, setTeamFilter] = useState<string>("all")
@@ -189,9 +192,6 @@ export default function VillaRaagBookingPage() {
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
   const [sortField, setSortField] = useState<keyof Booking>("createdDate")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
-
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedBookingId, setSelectedBookingId] = useState<string>("")
@@ -212,6 +212,10 @@ export default function VillaRaagBookingPage() {
   })
 
   const [viewMode, setViewMode] = useState<"table" | "chart">("table")
+
+  // Pagination for Active Villa Bookings
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const itemsPerPage = 10
 
   const filterByDate = (booking: Booking) => {
     if (dateFilter === "all") return true
@@ -258,16 +262,37 @@ export default function VillaRaagBookingPage() {
     })
 
   // Total Bookings = Online Bookings + OTA Bookings + Travel Agents
-  const onlineBookingEngine = filteredBookings.filter((b) => b.source === "Website Booking").length // Corrected source for online
+  const onlineBookingEngine = filteredBookings.filter((b) => b.source === "Online Booking Engine").length
   const otaBookings = filteredBookings.filter((b) => b.source === "OTA").length
   const travelAgents = filteredBookings.filter((b) => b.source === "Travel Agent").length
 
-  const totalBookings = onlineBookingEngine + otaBookings + travelAgents
+  // Show total bookings across all records regardless of status or current filters
+  const totalBookings = bookings.length
 
   // Total Bookings = Confirmed + Hold + Cancelled
-  const confirmedBookings = filteredBookings.filter((b) => b.status === "confirmed").length
-  const holdBookings = filteredBookings.filter((b) => b.salesTeamStatus === "on_hold").length
-  const cancelledBookings = filteredBookings.filter((b) => b.status === "cancelled").length
+  // Confirmed is a straightforward status match
+  const confirmedBookings = filteredBookings.filter((b) => (b.status ?? "").toString().toLowerCase() === "confirmed").length
+
+  // Hold: some records may use variations like 'on_hold', 'hold' or other conventions
+  const holdBookings = filteredBookings.filter((b) => {
+    const s = (b.salesTeamStatus ?? "").toString().toLowerCase()
+    return s === "on_hold" || s === "hold" || s.includes("hold")
+  }).length
+
+  // Cancelled: bookings may be marked cancelled in different fields (status, accountsVerifyStatus, frontOfficeStatus, paymentSettlementStatus)
+  const cancelledBookings = filteredBookings.filter((b) => {
+    const status = (b.status ?? "").toString().toLowerCase()
+    const accounts = (b.accountsVerifyStatus ?? "").toString().toLowerCase()
+    const front = (b.frontOfficeStatus ?? "").toString().toLowerCase()
+    const payment = (b.paymentSettlementStatus ?? "").toString().toLowerCase()
+
+    return (
+      status === "cancelled" ||
+      accounts.includes("cancel") ||
+      front.includes("cancel") ||
+      payment.includes("cancel")
+    )
+  }).length
 
   const pendingBookings = filteredBookings.filter((b) => b.status === "pending").length
   const totalAmount = filteredBookings.reduce((sum, booking) => sum + booking.amount, 0)
@@ -359,7 +384,7 @@ export default function VillaRaagBookingPage() {
             ? {
                 ...booking,
                 receivedAmount: booking.receivedAmount + Number.parseFloat(paymentData.receivedAmount),
-                paymentStatus: "paid", // Assuming any payment submission makes it 'paid' for simplicity
+                paymentStatus: "paid",
                 lastUpdated: new Date().toISOString(),
               }
             : booking,
@@ -382,7 +407,6 @@ export default function VillaRaagBookingPage() {
   }
 
   const getReceivedPercentage = (received: number, total: number) => {
-    if (total === 0) return 0
     return Math.round((received / total) * 100)
   }
 
@@ -476,10 +500,34 @@ export default function VillaRaagBookingPage() {
     (booking) => booking.status !== "cancelled" && booking.salesTeamStatus !== "on_hold",
   )
 
-  const totalPages = Math.ceil(activeBookings.length / itemsPerPage)
+  // Reset to first page when filters/search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, teamFilter, dateFilter, filteredBookings.length])
+
+  // Paginate active bookings
+  const totalPages = Math.max(1, Math.ceil(activeBookings.length / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedBookings = activeBookings.slice(startIndex, endIndex)
+  const displayedBookings = activeBookings.slice(startIndex, startIndex + itemsPerPage)
+
+  // When the user searches or applies filters, if there are results scroll the Active Bookings section into view.
+  // Watch search term and filters; debounce the scroll by 300ms to avoid jumping while typing.
+  useEffect(() => {
+    const hasActiveFilter =
+      (searchTerm && searchTerm.trim() !== "") || statusFilter !== "all" || teamFilter !== "all" || dateFilter !== "all"
+
+    if (!hasActiveFilter) return
+
+    if (filteredBookings.length === 0) return
+
+    const t = setTimeout(() => {
+      if (tableRef.current) {
+        tableRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }, 300)
+
+    return () => clearTimeout(t)
+  }, [searchTerm, statusFilter, teamFilter, dateFilter, filteredBookings.length])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -526,7 +574,8 @@ export default function VillaRaagBookingPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Removed FMSSidebar and its container */}
         <div className="space-y-8">
-          <Card className="bg-white/90 backdrop-blur-sm border-blue-300 shadow-xl">
+          <div>
+            <Card className="bg-white/90 backdrop-blur-sm border-blue-300 shadow-xl">
             <CardHeader className="bg-gradient-to-r from-blue-100 via-white to-indigo-100 border-b border-blue-200">
               <CardTitle className="flex items-center gap-3 text-xl font-bold text-slate-900">
                 <div className="p-2.5 bg-white rounded-lg shadow-md border border-blue-200">
@@ -636,7 +685,8 @@ export default function VillaRaagBookingPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
+            </Card>
+          </div>
 
           <Card className="bg-white/90 backdrop-blur-sm border-slate-300 shadow-xl">
             <CardHeader className="bg-gradient-to-r from-slate-100 via-white to-blue-100 border-b border-slate-200">
@@ -874,78 +924,6 @@ export default function VillaRaagBookingPage() {
                     </div>
                   </div>
 
-                  <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Revenue Metrics</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <Card className="bg-white border-indigo-300 shadow-md hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 min-w-0 flex-1">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                                Total Revenue
-                              </p>
-                              <p className="text-2xl font-bold text-slate-900">₹{totalAmount.toLocaleString()}</p>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-1 px-2 py-0.5 bg-indigo-100 rounded-full">
-                                  <TrendingUp className="h-3 w-3 text-indigo-700" />
-                                  <span className="text-xs font-semibold text-indigo-700">+10%</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-2 bg-indigo-100 rounded-lg flex-shrink-0 ml-2">
-                              <DollarSign className="h-6 w-6 text-indigo-700" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-white border-emerald-300 shadow-md hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 min-w-0 flex-1">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                                Amount Received
-                              </p>
-                              <p className="text-2xl font-bold text-slate-900">₹{totalReceived.toLocaleString()}</p>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 rounded-full">
-                                  <TrendingUp className="h-3 w-3 text-emerald-700" />
-                                  <span className="text-xs font-semibold text-emerald-700">+5%</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-2 bg-emerald-100 rounded-lg flex-shrink-0 ml-2">
-                              <CheckCircle className="h-6 w-6 text-emerald-700" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-white border-amber-300 shadow-md hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 min-w-0 flex-1">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                                Pending Amount
-                              </p>
-                              <p className="text-2xl font-bold text-slate-900">
-                                ₹{(totalAmount - totalReceived).toLocaleString()}
-                              </p>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 rounded-full">
-                                  <Clock className="h-3 w-3 text-amber-700" />
-                                  <span className="text-xs font-semibold text-amber-700">Due</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0 ml-2">
-                              <Clock className="h-6 w-6 text-amber-700" />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1036,8 +1014,79 @@ export default function VillaRaagBookingPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/90 backdrop-blur-sm border-blue-300 shadow-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-100 via-white to-indigo-100 border-b border-blue-300">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+            <Card className="bg-gradient-to-br from-indigo-700 to-indigo-800 text-white border-indigo-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 lg:space-y-2 min-w-0 flex-1">
+                    <p className="text-xs lg:text-sm font-medium uppercase tracking-wide truncate opacity-90">
+                      Total Revenue
+                    </p>
+                    <p className="text-xl lg:text-2xl xl:text-3xl font-bold">₹{totalAmount.toLocaleString()}</p>
+                    <div className="flex items-center gap-1 lg:gap-2">
+                      <div className="flex items-center gap-1 px-1.5 lg:px-2 py-0.5 lg:py-1 bg-white/20 rounded-full">
+                        <TrendingUp className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
+                        <span className="text-xs font-semibold">+10%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-xl flex-shrink-0 ml-2">
+                    <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-emerald-700 to-emerald-800 text-white border-emerald-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 lg:space-y-2 min-w-0 flex-1">
+                    <p className="text-xs lg:text-sm font-medium uppercase tracking-wide truncate opacity-90">
+                      Amount Received
+                    </p>
+                    <p className="text-xl lg:text-2xl xl:text-3xl font-bold">₹{totalReceived.toLocaleString()}</p>
+                    <div className="flex items-center gap-1 lg:gap-2">
+                      <div className="flex items-center gap-1 px-1.5 lg:px-2 py-0.5 lg:py-1 bg-white/20 rounded-full">
+                        <TrendingUp className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
+                        <span className="text-xs font-semibold">+5%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-xl flex-shrink-0 ml-2">
+                    <CheckCircle className="h-6 w-6 lg:h-8 lg:w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-amber-700 to-amber-800 text-white border-amber-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 lg:space-y-2 min-w-0 flex-1">
+                    <p className="text-xs lg:text-sm font-medium uppercase tracking-wide truncate opacity-90">
+                      Pending Amount
+                    </p>
+                    <p className="text-xl lg:text-2xl xl:text-3xl font-bold">
+                      ₹{(totalAmount - totalReceived).toLocaleString()}
+                    </p>
+                    <div className="flex items-center gap-1 lg:gap-2">
+                      <div className="flex items-center gap-1 px-1.5 lg:px-2 py-0.5 lg:py-1 bg-white/20 rounded-full">
+                        <Clock className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
+                        <span className="text-xs font-semibold">Due</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-xl flex-shrink-0 ml-2">
+                    <Clock className="h-6 w-6 lg:h-8 lg:w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div ref={tableRef}>
+            <Card className="bg-white/90 backdrop-blur-sm border-blue-300 shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-blue-100 via-white to-indigo-100 border-b border-blue-300">
               <CardTitle className="flex items-center gap-3 text-xl font-bold text-slate-900">
                 <div className="p-2.5 bg-white rounded-lg shadow-md border border-blue-200">
                   <CheckCircle className="h-5 w-5 text-blue-700" />
@@ -1102,7 +1151,7 @@ export default function VillaRaagBookingPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedBookings.map((booking, index) => (
+                    {displayedBookings.map((booking, index) => (
                       <TableRow
                         key={booking.id}
                         className={`border-blue-100 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-blue-25"}`}
@@ -1161,9 +1210,10 @@ export default function VillaRaagBookingPage() {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">
-                              {booking.assignedTo
-                                .split(" ")
-                                .map((n) => n[0])
+                              {(booking.assignedTo ?? "")
+                                .trim()
+                                .split(/\s+/)
+                                .map((n: string) => (n ? n.charAt(0).toUpperCase() : ""))
                                 .join("")}
                             </div>
                             <div>
@@ -1197,19 +1247,23 @@ export default function VillaRaagBookingPage() {
                                 <span className="text-slate-700">View Details</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className="my-1 border-blue-200" />
-                              <DropdownMenuItem
-                                onClick={() => handleAction("payment_upload", booking.id)}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                              >
-                                <Upload className="h-4 w-4 text-indigo-600" />
-                                <span className="text-slate-700">Upload Payment</span>
+                              <DropdownMenuItem asChild>
+                                <button
+                                  onClick={() => handleAction("payment_upload", booking.id)}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer w-full text-left"
+                                >
+                                  <Upload className="h-4 w-4 text-indigo-600" />
+                                  <span className="text-slate-700">Upload Payment</span>
+                                </button>
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleAction("cancel", booking.id)}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-red-50 cursor-pointer text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                <span>Cancel Booking</span>
+                              <DropdownMenuItem asChild>
+                                <button
+                                  onClick={() => handleAction("cancel", booking.id)}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-red-50 cursor-pointer w-full text-left text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span>Cancel Booking</span>
+                                </button>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1219,57 +1273,46 @@ export default function VillaRaagBookingPage() {
                   </TableBody>
                 </Table>
               </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <div className="text-sm text-slate-700">
-                    Showing <span className="font-semibold">{startIndex + 1}</span> to{" "}
-                    <span className="font-semibold">{Math.min(endIndex, activeBookings.length)}</span> of{" "}
-                    <span className="font-semibold">{activeBookings.length}</span> bookings
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="border-blue-300 hover:bg-blue-100"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                          className={
-                            currentPage === page
-                              ? "bg-blue-700 text-white hover:bg-blue-800"
-                              : "border-blue-300 hover:bg-blue-100"
-                          }
-                        >
-                          {page}
-                        </Button>
-                      ))}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="border-blue-300 hover:bg-blue-100"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
+              {/* Pagination controls for Active Villa Bookings */}
+              <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-100">
+                <div className="text-sm text-slate-600">
+                  Showing {(activeBookings.length === 0) ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, activeBookings.length)} of {activeBookings.length} bookings
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Prev
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`px-2 py-1 rounded ${currentPage === i + 1 ? "bg-blue-600 text-white" : "bg-white text-slate-700 border border-slate-200"}`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
 
           {/* Cancel Booking Modal */}
           <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>

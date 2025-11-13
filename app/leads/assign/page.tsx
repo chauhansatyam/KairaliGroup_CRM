@@ -28,6 +28,7 @@ import {
   DollarSign,
   Target,
   LineChart,
+  EyeOff,
 } from "lucide-react"
 import { BackButton } from "@/components/back-button"
 import type { Lead } from "@/types/lead"
@@ -41,7 +42,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Line, // Import Line from recharts
+  Line,
 } from "recharts"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -69,18 +70,20 @@ export default function LeadAssignmentPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [dataSourceSortField, setDataSourceSortField] = useState<string>("")
   const [dataSourceSortDirection, setDataSourceSortDirection] = useState<"asc" | "desc">("asc")
+  const [dataSourceTableVisible, setDataSourceTableVisible] = useState(true)
 
-  const [dateFilter, setDateFilter] = useState("all")
   const [selectedCompany, setSelectedCompany] = useState<string>("")
-  const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
 
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [dateError, setDateError] = useState("")
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isCallHistoryDialogOpen, setIsCallHistoryDialogOpen] = useState(false)
-  const [isSqvDialogOpen, setIsSqvDialogOpen] = useState(false) // Added state for SQV dialog
+  const [isSqvDialogOpen, setIsSqvDialogOpen] = useState(false)
 
   const [dataSourceView, setDataSourceView] = useState<"table" | "chart">("table")
 
@@ -103,7 +106,6 @@ export default function LeadAssignmentPage() {
   }
 
   const getSqvData = (leadId: string) => {
-    // Mock SQV data - in production, this would come from your API
     return {
       verifiedStatus: "Yes",
       sqvId: "1UI8LWPA2",
@@ -116,324 +118,63 @@ export default function LeadAssignmentPage() {
     }
   }
 
-  const sampleLeads: Lead[] = [
-    {
-      id: "lead-001",
-      name: "Rajesh Kumar",
-      email: "rajesh.kumar@example.com",
-      phone: "+91-9876543210",
-      subject: "Ayurvedic Treatment Inquiry",
-      notes: "Interested in Panchakarma treatment for 14 days",
-      source: "Facebook",
-      priority: "high",
-      status: "new",
-      company: "KTAHV",
-      createdAt: new Date().toISOString(),
-      ivrUrl: "https://ivr.example.com/recording/001",
-      websiteName: "Kairali AHV",
-      timestampTranscription: "2025-01-15 10:30 AM",
-      userName: "Sadik Rehman",
-      userPhone: "+91-9876543211",
-      userEmail: "sadik@kairali.com",
-      country: "India",
-      contactTime: "Morning (9 AM - 12 PM)",
-      conversationSummary: "Customer looking for detox and rejuvenation package",
-      leadOutcome: "Pending",
-      leadCategory: "Treatment",
-      preferredContact: "WhatsApp",
-      tatBreached: false,
-      assignedTo: "Sent Data - Squard Voice - API",
-      lastCallDate: "2025-01-15 10:30 AM",
-      lastDisposition: "Interested",
-      lastRemarks: "Customer wants more information about pricing",
-      callRecordingUrl: "https://recordings.example.com/lead-001-latest.mp3",
-    },
-    {
-      id: "lead-002",
-      name: "Priya Sharma",
-      email: "priya.sharma@example.com",
-      phone: "+91-9876543220",
-      subject: "Wellness Retreat Booking",
-      notes: "Looking for 7-day wellness retreat with spouse",
-      source: "Google",
-      priority: "medium",
-      status: "new",
-      company: "KAPPL",
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      ivrUrl: "https://ivr.example.com/recording/002",
-      websiteName: "Kairali APPL",
-      timestampTranscription: "2025-01-14 02:15 PM",
-      userName: "Pawan Kamra",
-      userPhone: "+91-9876543212",
-      userEmail: "pawan@kairali.com",
-      country: "USA",
-      contactTime: "Afternoon (12 PM - 5 PM)",
-      conversationSummary: "Couple interested in wellness and yoga retreat",
-      leadOutcome: "Pending",
-      leadCategory: "Wellness",
-      preferredContact: "Email",
-      tatBreached: false,
-      assignedTo: "CommonRedirect",
-      lastCallDate: "2025-01-14 02:15 PM",
-      lastDisposition: "Call Back",
-      lastRemarks: "Requested callback tomorrow morning",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-003",
-      name: "Mohammed Ali",
-      email: "mohammed.ali@example.com",
-      phone: "+971-501234567",
-      subject: "Abhyangam Treatment",
-      notes: "Wants to know about traditional Abhyangam massage",
-      source: "PriyaSharma AI-WhatsApp",
-      priority: "high",
-      status: "new",
-      company: "VILLARAAG",
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Villa Raag",
-      timestampTranscription: "2025-01-13 11:45 AM",
-      userName: "Pushpanshu Kumar",
-      userPhone: "+91-9876543213",
-      userEmail: "pushpanshu@kairali.com",
-      country: "UAE",
-      contactTime: "Evening (5 PM - 8 PM)",
-      conversationSummary: "Interested in traditional massage therapy",
-      leadOutcome: "Pending",
-      leadCategory: "Treatment",
-      preferredContact: "Phone",
-      tatBreached: true,
-      assignedTo: "Sadik Rehman",
-      lastCallDate: "2025-01-13 11:45 AM",
-      lastDisposition: "Not Interested",
-      lastRemarks: "Needs to discuss with family first",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-004",
-      name: "Sarah Johnson",
-      email: "sarah.j@example.com",
-      phone: "+44-7700900123",
-      subject: "Yoga and Meditation Retreat",
-      notes: "First-time visitor, interested in yoga programs",
-      source: "Website",
-      priority: "medium",
-      status: "new",
-      company: "KTAHV",
-      createdAt: new Date(Date.now() - 259200000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Kairali AHV",
-      timestampTranscription: "2025-01-12 09:20 AM",
-      userName: "Harpal Singh",
-      userPhone: "+91-9876543214",
-      userEmail: "harpal@kairali.com",
-      country: "UK",
-      contactTime: "Morning (9 AM - 12 PM)",
-      conversationSummary: "Looking for beginner-friendly yoga retreat",
-      leadOutcome: "Pending",
-      leadCategory: "Wellness",
-      preferredContact: "Email",
-      tatBreached: false,
-      assignedTo: "Sadik Rehman",
-      lastCallDate: "2025-01-12 09:20 AM",
-      lastDisposition: "Interested",
-      lastRemarks: "Customer wants more information about pricing",
-      callRecordingUrl: "https://recordings.example.com/lead-004-latest.mp3",
-    },
-    {
-      id: "lead-005",
-      name: "Amit Patel",
-      email: "amit.patel@example.com",
-      phone: "+91-9876543230",
-      subject: "Ayurvedic Products Purchase",
-      notes: "Interested in buying Vasarishtam and Yograj Guggulu",
-      source: "PriyaSharma AI-Instagram",
-      priority: "low",
-      status: "new",
-      company: "KAPPL",
-      createdAt: new Date(Date.now() - 345600000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Kairali Products",
-      timestampTranscription: "2025-01-11 03:30 PM",
-      userName: "Puneet Endlay",
-      userPhone: "+91-9876543215",
-      userEmail: "puneet@kairali.com",
-      country: "India",
-      contactTime: "Afternoon (12 PM - 5 PM)",
-      conversationSummary: "Customer wants to purchase ayurvedic medicines",
-      leadOutcome: "Pending",
-      leadCategory: "Product",
-      preferredContact: "WhatsApp",
-      tatBreached: false,
-      assignedTo: "Sadik Rehman",
-      lastCallDate: "2025-01-11 03:30 PM",
-      lastDisposition: "Busy",
-      lastRemarks: "Not available, will call back later",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-006",
-      name: "Lisa Chen",
-      email: "lisa.chen@example.com",
-      phone: "+65-91234567",
-      subject: "Detoxification Program",
-      notes: "Looking for 21-day detox program with diet consultation",
-      source: "Referral",
-      priority: "high",
-      status: "new",
-      company: "VILLARAAG",
-      createdAt: new Date(Date.now() - 432000000).toISOString(),
-      ivrUrl: "https://ivr.example.com/recording/006",
-      websiteName: "Villa Raag",
-      timestampTranscription: "2025-01-10 01:15 PM",
-      userName: "Sana Albi",
-      userPhone: "+91-9876543216",
-      userEmail: "sana@kairali.com",
-      country: "Singapore",
-      contactTime: "Morning (9 AM - 12 PM)",
-      conversationSummary: "Referred by previous client, wants comprehensive detox",
-      leadOutcome: "Pending",
-      leadCategory: "Treatment",
-      preferredContact: "Email",
-      tatBreached: false,
-      assignedTo: "Sent Data - Squard Voice - API",
-      lastCallDate: "2025-01-10 01:15 PM",
-      lastDisposition: "Interested",
-      lastRemarks: "Customer wants more information about pricing",
-      callRecordingUrl: "https://recordings.example.com/lead-006-latest.mp3",
-    },
-    {
-      id: "lead-007",
-      name: "David Miller",
-      email: "david.m@example.com",
-      phone: "+1-555-0123",
-      subject: "Corporate Wellness Program",
-      notes: "Inquiring about group wellness packages for 20 employees",
-      source: "IVR",
-      priority: "high",
-      status: "new",
-      company: "KTAHV",
-      createdAt: new Date(Date.now() - 518400000).toISOString(),
-      ivrUrl: "https://ivr.example.com/recording/007",
-      websiteName: "Kairali AHV",
-      timestampTranscription: "2025-01-09 10:00 AM",
-      userName: "Vidisha Bahukhandi",
-      userPhone: "+91-9876543217",
-      userEmail: "vidisha@kairali.com",
-      country: "USA",
-      contactTime: "Evening (5 PM - 8 PM)",
-      conversationSummary: "Corporate client looking for team wellness retreat",
-      leadOutcome: "Pending",
-      leadCategory: "Corporate",
-      preferredContact: "Phone",
-      tatBreached: true,
-      assignedTo: "Sadik Rehman",
-      lastCallDate: "2025-01-09 10:00 AM",
-      lastDisposition: "No Answer",
-      lastRemarks: "Not available, will call back later",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-008",
-      name: "Ananya Reddy",
-      email: "ananya.reddy@example.com",
-      phone: "+91-9876543240",
-      subject: "Spa and Beauty Treatments",
-      notes: "Interested in herbal spa treatments and beauty packages",
-      source: "PriyaSharma AI-Facebook",
-      priority: "medium",
-      status: "new",
-      company: "KAPPL",
-      createdAt: new Date(Date.now() - 604800000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Kairali APPL",
-      timestampTranscription: "2025-01-08 04:45 PM",
-      userName: "Zaki Ahmed",
-      userPhone: "+91-9876543218",
-      userEmail: "zaki@kairali.com",
-      country: "India",
-      contactTime: "Afternoon (12 PM - 5 PM)",
-      conversationSummary: "Looking for spa day package with beauty treatments",
-      leadOutcome: "Pending",
-      leadCategory: "Spa",
-      preferredContact: "WhatsApp",
-      tatBreached: false,
-      assignedTo: "AHV",
-      lastCallDate: "2025-01-08 04:45 PM",
-      lastDisposition: "Interested",
-      lastRemarks: "Customer wants more information about pricing",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-009",
-      name: "James Wilson",
-      email: "james.wilson@example.com",
-      phone: "+61-412345678",
-      subject: "Ayurvedic Consultation",
-      notes: "Wants online consultation for chronic back pain",
-      source: "Online Booking Engine",
-      priority: "medium",
-      status: "new",
-      company: "VILLARAAG",
-      createdAt: new Date(Date.now() - 691200000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Villa Raag",
-      timestampTranscription: "2025-01-07 11:30 AM",
-      userName: "Sadik Rehman",
-      userPhone: "+91-9876543211",
-      userEmail: "sadik@kairali.com",
-      country: "Australia",
-      contactTime: "Morning (9 AM - 12 PM)",
-      conversationSummary: "Patient seeking ayurvedic treatment for back pain",
-      leadOutcome: "Pending",
-      leadCategory: "Consultation",
-      preferredContact: "Video Call",
-      tatBreached: false,
-      assignedTo: "Sent Data - Squard Voice - API",
-      lastCallDate: "2025-01-07 11:30 AM",
-      lastDisposition: "Call Back",
-      lastRemarks: "Requested callback tomorrow morning",
-      callRecordingUrl: null,
-    },
-    {
-      id: "lead-010",
-      name: "Meera Nair",
-      email: "meera.nair@example.com",
-      phone: "+91-9876543250",
-      subject: "Monsoon Wellness Package",
-      notes: "Interested in Neo Monsoon Offer for family of 4",
-      source: "Site Exit Pop-Up Reference",
-      priority: "low",
-      status: "new",
-      company: "KTAHV",
-      createdAt: new Date(Date.now() - 777600000).toISOString(),
-      ivrUrl: null,
-      websiteName: "Kairali AHV",
-      timestampTranscription: "2025-01-06 02:00 PM",
-      userName: "Pawan Kamra",
-      userPhone: "+91-9876543212",
-      userEmail: "pawan@kairali.com",
-      country: "India",
-      contactTime: "Afternoon (12 PM - 5 PM)",
-      conversationSummary: "Family looking for monsoon special package",
-      leadOutcome: "Pending",
-      leadCategory: "Package",
-      preferredContact: "Phone",
-      tatBreached: false,
-      assignedTo: "Sent Data - Squard Voice - API",
-      lastCallDate: "2025-01-06 02:00 PM",
-      lastDisposition: "Interested",
-      lastRemarks: "Customer wants more information about pricing",
-      callRecordingUrl: null,
-    },
-  ]
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentLeads = filteredLeads.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, priorityFilter, sourceFilter, urgencyFilter, assignToFilter])
+
+  const [filteredByDateLeads, setFilteredByDateLeads] = useState<Lead[]>(leads)
 
   useEffect(() => {
     if (user && !selectedCompany) {
       setSelectedCompany(user.company || "KTAHV")
     }
   }, [user, selectedCompany])
+
+  // Date filtering logic (from old code)
+  useEffect(() => {
+    console.log('Total Leads:', leads.length, leads);
+    var filtered = leads.filter((lead) => lead.Company === selectedCompany)
+    filtered = filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+
+    if (startDate && !endDate) {
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.updatedAt).setHours(0, 0, 0, 0)
+        const filterStartDate = new Date(startDate).setHours(0, 0, 0, 0)
+        return leadDate >= filterStartDate
+      })
+    }
+
+    if (endDate && !startDate) {
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.updatedAt).setHours(0, 0, 0, 0)
+        const filterEndDate = new Date(endDate).setHours(23, 59, 59, 999)
+        return leadDate <= filterEndDate
+      })
+    }
+
+    if (startDate && endDate) {
+      if (endDate < startDate) {
+        setDateError("End date cannot be earlier than start date")
+      } else {
+        setDateError("")
+      }
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.updatedAt).setHours(0, 0, 0, 0)
+        const filterStartDate = new Date(startDate).setHours(0, 0, 0, 0)
+        const filterEndDate = new Date(endDate).setHours(23, 59, 59, 999)
+        return leadDate >= filterStartDate && leadDate <= filterEndDate
+      })
+    } else {
+      setDateError("")
+    }
+
+    setFilteredByDateLeads(filtered)
+  }, [leads, startDate, endDate, selectedCompany])
 
   useEffect(() => {
     if (!isLoading && (!user || !hasPermission("leads.assign"))) {
@@ -442,104 +183,76 @@ export default function LeadAssignmentPage() {
   }, [user, isLoading, hasPermission, router])
 
   useEffect(() => {
-    if (!selectedCompany) return
-
-    const allLeads = [...leads, ...sampleLeads]
-
-    const filtered = allLeads.filter((lead) => lead.company === selectedCompany)
+    const filtered = filteredLeads.filter(
+      (lead) =>
+        (!lead.assignedTo || lead.tatBreached || !lead.sentStatus) &&
+        (user?.permissions.includes("all") || lead.company === user?.company)
+    )
     setUnassignedLeads(filtered)
-  }, [leads, selectedCompany])
+  }, [leads, user, filteredLeads])
 
   useEffect(() => {
-    let filtered = unassignedLeads
-    console.log("[v0] Starting with unassigned leads:", filtered.length)
-
-    if (dateFilter !== "all") {
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-      filtered = filtered.filter((lead) => {
-        const leadDate = new Date(lead.createdAt)
-
-        switch (dateFilter) {
-          case "today":
-            return leadDate >= today
-          case "yesterday":
-            const yesterday = new Date(today)
-            yesterday.setDate(yesterday.getDate() - 1)
-            return leadDate >= yesterday && leadDate < today
-          case "this_week":
-            const weekStart = new Date(today)
-            weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-            return leadDate >= weekStart
-          case "this_month":
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-            return leadDate >= monthStart
-          case "custom":
-            if (customDateRange.start && customDateRange.end) {
-              const start = new Date(customDateRange.start)
-              const end = new Date(customDateRange.end)
-              return leadDate >= start && leadDate <= end
-            }
-            return true
-          default:
-            return true
-        }
-      })
-    }
+    let filtered = filteredByDateLeads
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (lead) =>
-          lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.name.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
           lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          lead.phone.includes(searchTerm) ||
+          lead.phone.toString().includes(searchTerm) ||
           lead.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          lead.notes?.toLowerCase().includes(searchTerm.toLowerCase()),
+          lead.notes?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     // Priority filter
     if (priorityFilter !== "all") {
+      console.log('Applying priority filter:', priorityFilter);
       filtered = filtered.filter((lead) => lead.priority === priorityFilter)
     }
 
-    // Source filter
+    // Source filter (using vSrc)
     if (sourceFilter !== "all") {
-      filtered = filtered.filter((lead) => lead.source === sourceFilter)
+      filtered = filtered.filter((lead) => lead.vSrc === sourceFilter)
     }
 
     // Urgency filter
     if (urgencyFilter !== "all") {
+      console.log('Applying urgency filter:', urgencyFilter);
       filtered = filtered.filter((lead) => {
-        const isUrgent = lead.priority === "high" || lead.tatBreached
-        return urgencyFilter === "yes" ? isUrgent : !isUrgent
+        const isUrgent = lead.priority == "high" || lead.tatBreached
+        return urgencyFilter == "yes" ? isUrgent : !isUrgent
       })
     }
 
+    // Assign To filter
     if (assignToFilter !== "all") {
-      filtered = filtered.filter((lead) => lead.assignedTo === assignToFilter)
+      if (assignToFilter === "unassigned") {
+        filtered = filtered.filter((lead) => lead.sentStatus === "")
+      } else {
+        filtered = filtered.filter((lead) => lead.sentStatus !== "")
+      }
     }
 
+    // Sorting
     if (sortField) {
       filtered.sort((a, b) => {
-        let aValue = a[sortField as keyof Lead]
-        let bValue = b[sortField as keyof Lead]
+        let aValueN = a[sortField as keyof typeof a]
+        let bValueN = b[sortField as keyof typeof b]
 
-        if (typeof aValue === "string") aValue = aValue.toLowerCase()
-        if (typeof bValue === "string") bValue = bValue.toLowerCase()
+        if (typeof aValueN === "string") aValueN = aValueN.toLowerCase()
+        if (typeof bValueN === "string") bValueN = bValueN.toLowerCase()
 
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1
+        if (aValueN < bValueN) return sortDirection === "asc" ? -1 : 1
+        if (aValueN > bValueN) return sortDirection === "asc" ? 1 : -1
         return 0
       })
     }
 
-    console.log("[v0] Final filtered leads for table:", filtered.length)
     setFilteredLeads(filtered)
   }, [
-    unassignedLeads,
+    filteredByDateLeads,
     searchTerm,
     priorityFilter,
     sourceFilter,
@@ -547,15 +260,13 @@ export default function LeadAssignmentPage() {
     assignToFilter,
     sortField,
     sortDirection,
-    dateFilter,
-    customDateRange,
   ])
 
   const salesAgents = getAllUsers().filter(
     (u) =>
       (u.role === "sales_agent" || u.role === "sales_manager") &&
       u.isActive &&
-      (user?.permissions.includes("all") || u.company === user?.company),
+      (user?.permissions.includes("all") || u.company === user?.company)
   )
 
   const handleSort = (field: string) => {
@@ -586,88 +297,6 @@ export default function LeadAssignmentPage() {
     return dataSourceSortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
   }
 
-  const dataSourceBreakdown = [
-    "Facebook",
-    "Google",
-    "PriyaSharma AI-Web",
-    "PriyaSharma AI-WhatsApp",
-    "Website",
-    "Site Exit Pop-Up Reference",
-    "Others",
-    "PriyaSharma AI-Instagram",
-    "PriyaSharma AI Chat",
-    "Referral",
-    "Zopim",
-    "IVR",
-    "Magento Failure Order",
-    "OTA",
-    "Online Booking Engine",
-    "Management",
-    "PriyaSharma AI-Facebook",
-  ].map((source) => {
-    const sourceLeads = leads.filter(
-      (lead) =>
-        (lead.source === source || lead.source.toLowerCase() === source.toLowerCase()) &&
-        lead.company === selectedCompany,
-    )
-    const totalLeads = sourceLeads.length
-    const nbdLeads = Math.floor(totalLeads * 0.6) // Mock NBD data
-    const crrLeads = totalLeads - nbdLeads // Mock CRR data
-    const growth = (Math.random() * 30 - 10).toFixed(1) // Mock growth percentage
-
-    const convertedCount = Math.floor(totalLeads * (0.15 + Math.random() * 0.25)) // 15-40% conversion rate
-    const conversionAmount = convertedCount * (50000 + Math.random() * 150000) // Random amount per conversion
-    const conversionPercentage = totalLeads > 0 ? ((convertedCount / totalLeads) * 100).toFixed(2) : "0.00"
-    const adSpend = totalLeads * (500 + Math.random() * 1500) // Mock ad spend per lead
-    const roas = adSpend > 0 ? (conversionAmount / adSpend).toFixed(2) : "0.00"
-
-    return {
-      dataSource: source,
-      totalLeads,
-      nbd: nbdLeads,
-      crrLeads,
-      growth: Number.parseFloat(growth),
-      convertedCount,
-      conversionAmount,
-      conversionPercentage: Number.parseFloat(conversionPercentage),
-      spendAmount: adSpend,
-      roas: Number.parseFloat(roas),
-    }
-  })
-
-  const sortedDataSourceBreakdown = [...dataSourceBreakdown].sort((a, b) => {
-    if (!dataSourceSortField) return 0
-
-    let aValue = a[dataSourceSortField as keyof typeof a]
-    let bValue = b[dataSourceSortField as keyof typeof b]
-
-    if (typeof aValue === "string") aValue = aValue.toLowerCase()
-    if (typeof bValue === "string") bValue = bValue.toLowerCase()
-
-    if (aValue < bValue) return dataSourceSortDirection === "asc" ? -1 : 1
-    if (aValue > bValue) return dataSourceSortDirection === "asc" ? 1 : -1
-    return 0
-  })
-
-  const grandTotal = {
-    totalLeads: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.totalLeads, 0),
-    nbd: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.nbd, 0),
-    crrLeads: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.crrLeads, 0),
-    avgGrowth: (
-      sortedDataSourceBreakdown.reduce((sum, item) => sum + item.growth, 0) / sortedDataSourceBreakdown.length
-    ).toFixed(1),
-    convertedCount: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.convertedCount, 0),
-    conversionAmount: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.conversionAmount, 0),
-    avgConversionPercentage: (
-      sortedDataSourceBreakdown.reduce((sum, item) => sum + item.conversionPercentage, 0) /
-      sortedDataSourceBreakdown.length
-    ).toFixed(2),
-    spendAmount: sortedDataSourceBreakdown.reduce((sum, item) => sum + item.spendAmount, 0),
-    avgRoas: (
-      sortedDataSourceBreakdown.reduce((sum, item) => sum + item.roas, 0) / sortedDataSourceBreakdown.length
-    ).toFixed(2),
-  }
-
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
@@ -678,12 +307,86 @@ export default function LeadAssignmentPage() {
 
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentLeads = filteredLeads.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
 
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber)
   }
+
+  // Calculate statistics (from old code)
+  var totalNBDCount = 0
+  var totalCRRCount = 0
+  var totalSentSQVNBDCount = 0
+  var totalSentSQVCRRCount = 0
+  var totalSentDialerNBDCount = 0
+  var totalSentDialerCRRCount = 0
+  var totalSentAppsheetNBDCount = 0
+  var totalSentAppsheetCRRCount = 0
+  var totalSentDeleteNBDCount = 0
+  var totalSentDeleteCRRCount = 0
+  var sourceWiseMap = new Map<string, { totalLeads: number; nbd: number; crr: number }>()
+
+  filteredByDateLeads.forEach((lead) => {
+    if (lead["NBD/CRR"] === "CRR") totalCRRCount++
+    else totalNBDCount++
+
+    if (lead.sentStatus) {
+      if (lead.assignedTo.includes("Squard Voice")) {
+        if (lead["NBD/CRR"] === "CRR") totalSentSQVCRRCount++
+        else totalSentSQVNBDCount++
+      } else if (
+        ["AHV", "KAPPL", "CRR", "ColdCalling", "all", "KTAHV COLD CALLING", "KTAHV CRR SALES"].indexOf(
+          lead.assignedTo
+        ) > -1
+      ) {
+        if (lead["NBD/CRR"] === "CRR") totalSentDialerCRRCount++
+        else totalSentDialerNBDCount++
+      } else if (lead.assignedTo.includes("Delete")) {
+        if (lead["NBD/CRR"] === "CRR") totalSentDeleteCRRCount++
+        else totalSentDeleteNBDCount++
+      } else {
+        if (lead["NBD/CRR"] === "CRR") totalSentAppsheetCRRCount++
+        else totalSentAppsheetNBDCount++
+      }
+    }
+
+    var src = lead.vSrc || "Others"
+    if (sourceWiseMap.has(src)) {
+      var entry = sourceWiseMap.get(src)
+      entry!.totalLeads += 1
+      if (lead["NBD/CRR"] === "CRR") entry!.crr += 1
+      else entry!.nbd += 1
+      sourceWiseMap.set(src, entry!)
+    } else {
+      if (lead["NBD/CRR"] === "CRR") sourceWiseMap.set(src, { totalLeads: 1, nbd: 0, crr: 1 })
+      else sourceWiseMap.set(src, { totalLeads: 1, nbd: 1, crr: 0 })
+    }
+  })
+
+  var srcData = Array.from(sourceWiseMap, ([dataSource, values]) => ({ dataSource, ...values }))
+  if (dataSourceSortField) {
+    srcData.sort((a, b) => {
+      let aValue = a[dataSourceSortField as keyof typeof a]
+      let bValue = b[dataSourceSortField as keyof typeof b]
+
+      if (typeof aValue === "string") aValue = aValue.toLowerCase()
+      if (typeof bValue === "string") bValue = bValue.toLowerCase()
+
+      if (aValue < bValue) return dataSourceSortDirection === "asc" ? -1 : 1
+      if (aValue > bValue) return dataSourceSortDirection === "asc" ? 1 : -1
+      return 0
+    })
+  }
+
+  // Data for charts
+  const chartData = srcData.map((item) => ({
+    ...item,
+    growth: (Math.random() * 30 - 10).toFixed(1),
+    convertedCount: Math.floor(item.totalLeads * (0.15 + Math.random() * 0.25)),
+    conversionAmount: Math.floor(item.totalLeads * (0.15 + Math.random() * 0.25)) * (50000 + Math.random() * 150000),
+    conversionPercentage: item.totalLeads > 0 ? ((Math.floor(item.totalLeads * 0.25) / item.totalLeads) * 100).toFixed(2) : "0.00",
+    spendAmount: item.totalLeads * (500 + Math.random() * 1500),
+    roas: item.totalLeads > 0 ? ((Math.floor(item.totalLeads * 0.25) * 85000) / (item.totalLeads * 1000)).toFixed(2) : "0.00",
+  }))
 
   return (
     <DashboardLayout>
@@ -699,61 +402,47 @@ export default function LeadAssignmentPage() {
                   key={company}
                   variant={selectedCompany === company ? "default" : "outline"}
                   onClick={() => setSelectedCompany(company)}
-                  className={`flex-1 font-semibold text-base py-6 ${
-                    selectedCompany === company
-                      ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                      : "hover:bg-slate-100"
-                  }`}
+                  className={`flex-1 font-semibold text-base py-6 ${selectedCompany === company
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                    : "hover:bg-slate-100"
+                    }`}
                 >
                   {company}
                 </Button>
               ))}
             </div>
 
-            {/* Date Filter and Search */}
+            {/* Date Filter */}
             <div className="grid gap-4 md:grid-cols-6 mb-4">
               <div className="md:col-span-2">
                 <label className="text-sm font-medium mb-2 block flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Date Filter
+                  Start Date
                 </label>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select date range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="yesterday">Yesterday</SelectItem>
-                    <SelectItem value="this_week">This Week</SelectItem>
-                    <SelectItem value="this_month">This Month</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`w-full ${dateError ? "border-red-500 focus:border-red-500" : ""}`}
+                  max={endDate}
+                />
               </div>
 
-              {dateFilter === "custom" && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Start Date</label>
-                    <Input
-                      type="date"
-                      value={customDateRange.start}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, start: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">End Date</label>
-                    <Input
-                      type="date"
-                      value={customDateRange.end}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, end: e.target.value })}
-                    />
-                  </div>
-                </>
-              )}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  End Date
+                </label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`w-full ${dateError ? "border-red-500 focus:border-red-500" : ""}`}
+                  min={startDate}
+                />
+              </div>
 
-              <div className={dateFilter === "custom" ? "md:col-span-2" : "md:col-span-4"}>
+              <div className="md:col-span-2">
                 <label className="text-sm font-medium mb-2 block flex items-center gap-2">
                   <Search className="h-4 w-4" />
                   Search Leads
@@ -768,14 +457,14 @@ export default function LeadAssignmentPage() {
             </div>
 
             {/* Additional Filters */}
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-6">
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
                 </SelectContent>
@@ -786,11 +475,11 @@ export default function LeadAssignmentPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
-                  <SelectItem value="social_media">Social Media</SelectItem>
+                  {srcData.map((srcX) => (
+                    <SelectItem key={srcX.dataSource} value={srcX.dataSource}>
+                      {srcX.dataSource}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
@@ -808,28 +497,25 @@ export default function LeadAssignmentPage() {
                   <SelectValue placeholder="Assign To" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Agents</SelectItem>
-                  {salesAgents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                 </SelectContent>
               </Select>
               <Button
                 variant="outline"
                 onClick={() => {
+                  setStartDate("")
+                  setEndDate("")
                   setSearchTerm("")
                   setPriorityFilter("all")
                   setSourceFilter("all")
                   setUrgencyFilter("all")
                   setAssignToFilter("all")
-                  setDateFilter("all")
-                  setCustomDateRange({ start: "", end: "" })
                   setSortField("")
                   setSortDirection("asc")
                 }}
-                className="w-full"
+                className="md:col-span-2"
               >
                 Clear All Filters
               </Button>
@@ -843,22 +529,24 @@ export default function LeadAssignmentPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-          {/* First Line - 6 boxes */}
+          {/* Statistics Cards with Real Data */}
           <Card className="bg-blue-50 border-blue-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-blue-800">Total Unique Lead Received</CardTitle>
               <div className="flex items-center gap-1">
                 <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-500">+12%</span>
+                <span className="text-xs text-green-500">0%</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-900">
-                {leads.filter((l) => l.company === selectedCompany).length}
-              </div>
+              <div className="text-2xl font-bold text-blue-900">{filteredByDateLeads.length}</div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-green-600 font-medium">NBD: 45 (+8%)</span>
-                <span className="text-red-600 font-medium">CRR: 23 (-3%)</span>
+                <span className="text-green-600 font-medium">
+                  NBD: {totalNBDCount} ({filteredByDateLeads.length > 0 ? ((totalNBDCount / filteredByDateLeads.length) * 100).toFixed(2) : 0}%)
+                </span>
+                <span className="text-red-600 font-medium">
+                  CRR: {totalCRRCount} ({filteredByDateLeads.length > 0 ? ((totalCRRCount / filteredByDateLeads.length) * 100).toFixed(2) : 0}%)
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -868,14 +556,18 @@ export default function LeadAssignmentPage() {
               <CardTitle className="text-sm font-medium">Transfer to Dialer</CardTitle>
               <div className="flex items-center gap-1">
                 <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-500">+8%</span>
+                <span className="text-xs text-green-500">0%</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">234</div>
+              <div className="text-2xl font-bold">{totalSentDialerNBDCount + totalSentDialerCRRCount}</div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-green-600 font-medium">NBD: 134 (+15%)</span>
-                <span className="text-green-600 font-medium">CRR: 100 (+5%)</span>
+                <span className="text-green-600 font-medium">
+                  NBD: {totalSentDialerNBDCount} ({totalSentDialerNBDCount + totalSentDialerCRRCount > 0 ? ((totalSentDialerNBDCount / (totalSentDialerNBDCount + totalSentDialerCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
+                <span className="text-green-600 font-medium">
+                  CRR: {totalSentDialerCRRCount} ({totalSentDialerNBDCount + totalSentDialerCRRCount > 0 ? ((totalSentDialerCRRCount / (totalSentDialerNBDCount + totalSentDialerCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -884,15 +576,19 @@ export default function LeadAssignmentPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-emerald-800">Transfer to SQV</CardTitle>
               <div className="flex items-center gap-1">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-500">+12%</span>
+                <TrendingDown className="h-4 w-4 text-red-500" />
+                <span className="text-xs text-red-500">0%</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-900">156</div>
+              <div className="text-2xl font-bold text-emerald-900">{totalSentSQVNBDCount + totalSentSQVCRRCount}</div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-green-600 font-medium">NBD: 92 (+18%)</span>
-                <span className="text-green-600 font-medium">CRR: 64 (+8%)</span>
+                <span className="text-green-600 font-medium">
+                  NBD: {totalSentSQVNBDCount} ({totalSentSQVNBDCount + totalSentSQVCRRCount > 0 ? ((totalSentSQVNBDCount / (totalSentSQVNBDCount + totalSentSQVCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
+                <span className="text-red-600 font-medium">
+                  CRR: {totalSentSQVCRRCount} ({totalSentSQVNBDCount + totalSentSQVCRRCount > 0 ? ((totalSentSQVCRRCount / (totalSentSQVNBDCount + totalSentSQVCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -902,14 +598,18 @@ export default function LeadAssignmentPage() {
               <CardTitle className="text-sm font-medium">Transfer to Appsheet</CardTitle>
               <div className="flex items-center gap-1">
                 <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-500">+15%</span>
+                <span className="text-xs text-green-500">0%</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">89</div>
+              <div className="text-2xl font-bold">{totalSentAppsheetNBDCount + totalSentAppsheetCRRCount}</div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-green-600 font-medium">NBD: 52 (+10%)</span>
-                <span className="text-red-600 font-medium">CRR: 37 (-2%)</span>
+                <span className="text-green-600 font-medium">
+                  NBD: {totalSentAppsheetNBDCount} ({totalSentAppsheetNBDCount + totalSentAppsheetCRRCount > 0 ? ((totalSentAppsheetNBDCount / (totalSentAppsheetNBDCount + totalSentAppsheetCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
+                <span className="text-red-600 font-medium">
+                  CRR: {totalSentAppsheetCRRCount} ({totalSentAppsheetNBDCount + totalSentAppsheetCRRCount > 0 ? ((totalSentAppsheetCRRCount / (totalSentAppsheetNBDCount + totalSentAppsheetCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -919,14 +619,18 @@ export default function LeadAssignmentPage() {
               <CardTitle className="text-sm font-medium">Transfer to Delete Sheet</CardTitle>
               <div className="flex items-center gap-1">
                 <TrendingDown className="h-4 w-4 text-red-500" />
-                <span className="text-xs text-red-500">-3%</span>
+                <span className="text-xs text-red-500">0%</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">45</div>
+              <div className="text-2xl font-bold">{totalSentDeleteNBDCount + totalSentDeleteCRRCount}</div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-red-600 font-medium">NBD: 28 (-5%)</span>
-                <span className="text-red-600 font-medium">CRR: 17 (-8%)</span>
+                <span className="text-red-600 font-medium">
+                  NBD: {totalSentDeleteNBDCount} ({totalSentDeleteNBDCount + totalSentDeleteCRRCount > 0 ? ((totalSentDeleteNBDCount / (totalSentDeleteNBDCount + totalSentDeleteCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
+                <span className="text-red-600 font-medium">
+                  CRR: {totalSentDeleteCRRCount} ({totalSentDeleteNBDCount + totalSentDeleteCRRCount > 0 ? ((totalSentDeleteCRRCount / (totalSentDeleteNBDCount + totalSentDeleteCRRCount)) * 100).toFixed(2) : 0}%)
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -937,11 +641,12 @@ export default function LeadAssignmentPage() {
               <Users className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-900">{filteredLeads.length}</div>
+              <div className="text-2xl font-bold text-orange-900">{unassignedLeads.length}</div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Second row of statistics cards - keeping the new UI but with mock data for now */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card className="bg-green-50 border-green-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -953,7 +658,7 @@ export default function LeadAssignmentPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-900">
-                {Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25)}
+                {Math.floor(filteredByDateLeads.length * 0.25)}
               </div>
               <div className="flex flex-col gap-1 text-xs mt-2">
                 <div className="flex items-center justify-between">
@@ -982,10 +687,7 @@ export default function LeadAssignmentPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-900">
-                ₹
-                {(Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25) * 85000).toLocaleString(
-                  "en-IN",
-                )}
+                ₹{(Math.floor(filteredByDateLeads.length * 0.25) * 85000).toLocaleString("en-IN")}
               </div>
               <div className="flex flex-col gap-1 text-xs mt-2">
                 <div className="flex items-center justify-between">
@@ -1014,11 +716,9 @@ export default function LeadAssignmentPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-teal-900">
-                {(
-                  (Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25) /
-                    leads.filter((l) => l.company === selectedCompany).length) *
-                  100
-                ).toFixed(1)}
+                {filteredByDateLeads.length > 0
+                  ? ((Math.floor(filteredByDateLeads.length * 0.25) / filteredByDateLeads.length) * 100).toFixed(1)
+                  : 0}
                 %
               </div>
               <div className="flex flex-col gap-1 text-xs mt-2">
@@ -1048,10 +748,7 @@ export default function LeadAssignmentPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-indigo-900">
-                ₹
-                {(Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25) * 2500).toLocaleString(
-                  "en-IN",
-                )}
+                ₹{(Math.floor(filteredByDateLeads.length * 0.25) * 2500).toLocaleString("en-IN")}
               </div>
               <div className="flex flex-col gap-1 text-xs mt-2">
                 <div className="flex items-center justify-between">
@@ -1080,10 +777,12 @@ export default function LeadAssignmentPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-900">
-                {(
-                  (Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25) * 85000) /
-                  (Math.floor(leads.filter((l) => l.company === selectedCompany).length * 0.25) * 2500)
-                ).toFixed(2)}
+                {filteredByDateLeads.length > 0
+                  ? (
+                    (Math.floor(filteredByDateLeads.length * 0.25) * 85000) /
+                    (Math.floor(filteredByDateLeads.length * 0.25) * 2500)
+                  ).toFixed(2)
+                  : 0}
                 x
               </div>
               <div className="flex flex-col gap-1 text-xs mt-2">
@@ -1104,11 +803,14 @@ export default function LeadAssignmentPage() {
           </Card>
         </div>
 
+        {/* Data Source Breakdown Table with Real Data */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Data Source Breakdown - Total Unique Lead Received ({selectedCompany})</CardTitle>
-              <CardDescription>Analyze lead performance across different data sources</CardDescription>
+              <div>
+                <CardTitle>Data Source Breakdown - Total Unique Lead Received ({selectedCompany})</CardTitle>
+                <CardDescription>Analyze lead performance across different data sources</CardDescription>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant={dataSourceView === "table" ? "default" : "ghost"}
@@ -1155,10 +857,10 @@ export default function LeadAssignmentPage() {
                           {renderDataSourceSortIcon("nbd")}
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("crrLeads")}>
+                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("crr")}>
                         <div className="flex items-center gap-2">
                           CRR
-                          {renderDataSourceSortIcon("crrLeads")}
+                          {renderDataSourceSortIcon("crr")}
                         </div>
                       </TableHead>
                       <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("growth")}>
@@ -1167,169 +869,59 @@ export default function LeadAssignmentPage() {
                           {renderDataSourceSortIcon("growth")}
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("convertedCount")}>
-                        <div className="flex items-center gap-2">
-                          Converted Count
-                          {renderDataSourceSortIcon("convertedCount")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("conversionAmount")}>
-                        <div className="flex items-center gap-2">
-                          Conversion Amount
-                          {renderDataSourceSortIcon("conversionAmount")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer"
-                        onClick={() => handleDataSourceSort("conversionPercentage")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Conversion %{renderDataSourceSortIcon("conversionPercentage")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("spendAmount")}>
-                        <div className="flex items-center gap-2">
-                          Spend Amount
-                          {renderDataSourceSortIcon("spendAmount")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleDataSourceSort("roas")}>
-                        <div className="flex items-center gap-2">
-                          ROAS
-                          {renderDataSourceSortIcon("roas")}
-                        </div>
-                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedDataSourceBreakdown.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{item.dataSource}</TableCell>
+                    {srcData.map((src) => (
+                      <TableRow key={src.dataSource}>
+                        <TableCell className="font-medium">{src.dataSource}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="font-semibold">
-                            {item.totalLeads}
+                            {src.totalLeads}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="text-blue-600 font-medium">{item.nbd}</span>
+                          <span className="text-blue-600 font-medium">
+                            {src.nbd} ({((src.nbd / src.totalLeads) * 100).toFixed(2)}%)
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-orange-600 font-medium">{item.crrLeads}</span>
+                          <span className="text-orange-600 font-medium">
+                            {src.crr} ({((src.crr / src.totalLeads) * 100).toFixed(2)}%)
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            {item.growth >= 0 ? (
-                              <>
-                                <TrendingUp className="h-4 w-4 text-green-500" />
-                                <span className="text-green-600 font-medium">+{item.growth}%</span>
-                              </>
+                          {src.totalLeads > 0 ? (
+                            src.nbd > src.crr ? (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <ArrowUp className="h-4 w-4" />
+                                <span>{(((src.nbd - src.crr) / src.totalLeads) * 100).toFixed(2)}%</span>
+                              </div>
+                            ) : src.crr > src.nbd ? (
+                              <div className="flex items-center gap-1 text-red-600">
+                                <ArrowDown className="h-4 w-4" />
+                                <span>{(((src.crr - src.nbd) / src.totalLeads) * 100).toFixed(2)}%</span>
+                              </div>
                             ) : (
-                              <>
-                                <TrendingDown className="h-4 w-4 text-red-500" />
-                                <span className="text-red-600 font-medium">{item.growth}%</span>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="default" className="bg-green-100 text-green-800 font-semibold">
-                            {item.convertedCount}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-purple-600 font-semibold">
-                            ₹{item.conversionAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              item.conversionPercentage >= 30
-                                ? "border-green-500 text-green-700 bg-green-50"
-                                : item.conversionPercentage >= 20
-                                  ? "border-yellow-500 text-yellow-700 bg-yellow-50"
-                                  : "border-red-500 text-red-700 bg-red-50"
-                            }
-                          >
-                            {item.conversionPercentage}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-indigo-600 font-semibold">
-                            ₹{item.spendAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={`font-bold ${item.roas >= 3 ? "text-green-600" : item.roas >= 2 ? "text-yellow-600" : "text-red-600"}`}
-                            >
-                              {item.roas}x
-                            </span>
-                          </div>
+                              <div className="flex items-center gap-1 text-gray-600">
+                                <span>0%</span>
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex items-center gap-1 text-gray-600">
+                              <span>N/A</span>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                      <TableCell className="font-bold text-slate-900">Grand Total</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-bold bg-slate-200 text-slate-900">
-                          {grandTotal.totalLeads}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-blue-700 font-bold">{grandTotal.nbd}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-orange-700 font-bold">{grandTotal.crrLeads}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {Number.parseFloat(grandTotal.avgGrowth) >= 0 ? (
-                            <>
-                              <TrendingUp className="h-4 w-4 text-green-600" />
-                              <span className="text-green-700 font-bold">+{grandTotal.avgGrowth}%</span>
-                            </>
-                          ) : (
-                            <>
-                              <TrendingDown className="h-4 w-4 text-red-600" />
-                              <span className="text-red-700 font-bold">{grandTotal.avgGrowth}%</span>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="default" className="bg-green-200 text-green-900 font-bold">
-                          {grandTotal.convertedCount}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-purple-700 font-bold">
-                          ₹{grandTotal.conversionAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-slate-400 text-slate-900 bg-slate-50 font-bold">
-                          {grandTotal.avgConversionPercentage}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-indigo-700 font-bold">
-                          ₹{grandTotal.spendAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-slate-900 font-bold">{grandTotal.avgRoas}x</span>
-                      </TableCell>
-                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
             ) : (
               <div className="space-y-4">
                 <Tabs defaultValue="leads" className="w-full">
-                  <TabsList className="grid w-full grid-cols-5 h-auto p-1 bg-muted/50">
+                  <TabsList className="grid w-full grid-cols-2 h-auto p-1 bg-muted/50">
                     <TabsTrigger
                       value="leads"
                       className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all px-4 py-3"
@@ -1340,244 +932,23 @@ export default function LeadAssignmentPage() {
                       </div>
                     </TabsTrigger>
                     <TabsTrigger
-                      value="conversion"
+                      value="breakdown"
                       className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-3"
                     >
                       <div className="flex flex-col items-center gap-1">
                         <TrendingUp className="h-4 w-4" />
-                        <span className="text-xs font-medium">Conversion</span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="revenue"
-                      className="data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all px-4 py-3"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        <span className="text-xs font-medium">Revenue</span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="spend"
-                      className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all px-4 py-3"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <Target className="h-4 w-4" />
-                        <span className="text-xs font-medium">Spend & ROAS</span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="comparison"
-                      className="data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all px-4 py-3"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <LineChart className="h-4 w-4" />
-                        <span className="text-xs font-medium">Comparison</span>
+                        <span className="text-xs font-medium">NBD vs CRR</span>
                       </div>
                     </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="leads" className="h-[600px] mt-6">
-                    <div className="grid grid-cols-2 gap-4 h-full">
-                      {/* Main Chart */}
-                      <div className="col-span-2 h-[280px] border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-white">
-                        <h3 className="text-sm font-semibold mb-3 text-blue-900">Lead Distribution Overview</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={sortedDataSourceBreakdown}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={100} fontSize={11} />
-                            <YAxis stroke="#6b7280" />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                              }}
-                            />
-                            <Legend wrapperStyle={{ paddingTop: "10px" }} />
-                            <Bar dataKey="totalLeads" fill="#3b82f6" name="Total Leads" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="nbd" fill="#10b981" name="NBD" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="crrLeads" fill="#f59e0b" name="CRR" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Converted Count Chart */}
-                      <div className="h-[280px] border rounded-lg p-4 bg-gradient-to-br from-green-50 to-white">
-                        <h3 className="text-sm font-semibold mb-3 text-green-900">Converted Leads</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={sortedDataSourceBreakdown}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={100} fontSize={10} />
-                            <YAxis stroke="#6b7280" />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                              }}
-                            />
-                            <Bar dataKey="convertedCount" fill="#22c55e" name="Converted" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Conversion Percentage Chart */}
-                      <div className="h-[280px] border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-white">
-                        <h3 className="text-sm font-semibold mb-3 text-purple-900">Conversion Rate</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={sortedDataSourceBreakdown}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={100} fontSize={10} />
-                            <YAxis stroke="#6b7280" />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                              }}
-                              formatter={(value: number) => `${value}%`}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="conversionPercentage"
-                              stroke="#a855f7"
-                              strokeWidth={3}
-                              name="Conv %"
-                              dot={{ fill: "#a855f7", r: 4 }}
-                              activeDot={{ r: 6 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="conversion" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-green-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-green-900">Conversion Metrics Analysis</h3>
+                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-blue-50 to-white">
+                      <h3 className="text-sm font-semibold mb-3 text-blue-900">Lead Distribution by Source</h3>
                       <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={sortedDataSourceBreakdown}>
+                        <BarChart data={srcData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={12} />
-                          <YAxis yAxisId="left" stroke="#22c55e" />
-                          <YAxis yAxisId="right" orientation="right" stroke="#8b5cf6" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "8px",
-                              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                            }}
-                          />
-                          <Legend />
-                          <Bar
-                            yAxisId="left"
-                            dataKey="convertedCount"
-                            fill="#22c55e"
-                            name="Converted Count"
-                            radius={[4, 4, 0, 0]}
-                          />
-                          <Bar
-                            yAxisId="right"
-                            dataKey="conversionPercentage"
-                            fill="#8b5cf6"
-                            name="Conversion %"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="revenue" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-purple-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-purple-900">Revenue Analysis</h3>
-                      <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={sortedDataSourceBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={12} />
-                          <YAxis stroke="#a855f7" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "8px",
-                              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                            }}
-                            formatter={(value: number) =>
-                              `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
-                            }
-                          />
-                          <Legend />
-                          <Bar
-                            dataKey="conversionAmount"
-                            fill="#a855f7"
-                            name="Conversion Amount (₹)"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="spend" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-indigo-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-indigo-900">Spend & ROAS Performance</h3>
-                      <ResponsiveContainer width="100%" height="90%">
-                        <LineChart data={sortedDataSourceBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={12} />
-                          <YAxis yAxisId="left" stroke="#6366f1" />
-                          <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "8px",
-                              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                            }}
-                            formatter={(value: number, name: string) => {
-                              if (name === "Spend Amount (₹)") {
-                                return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
-                              }
-                              return `${value}x`
-                            }}
-                          />
-                          <Legend />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="spendAmount"
-                            stroke="#6366f1"
-                            name="Spend Amount (₹)"
-                            strokeWidth={3}
-                            dot={{ fill: "#6366f1", r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="roas"
-                            stroke="#f59e0b"
-                            name="ROAS"
-                            strokeWidth={3}
-                            dot={{ fill: "#f59e0b", r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="comparison" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-amber-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-amber-900">Multi-Metric Comparison</h3>
-                      <ResponsiveContainer width="100%" height="90%">
-                        <LineChart data={sortedDataSourceBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={12} />
+                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
                           <YAxis stroke="#6b7280" />
                           <Tooltip
                             contentStyle={{
@@ -1587,32 +958,32 @@ export default function LeadAssignmentPage() {
                               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                             }}
                           />
+                          <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                          <Bar dataKey="totalLeads" fill="#3b82f6" name="Total Leads" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="breakdown" className="h-[600px] mt-6">
+                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-green-50 to-white">
+                      <h3 className="text-sm font-semibold mb-3 text-green-900">NBD vs CRR Distribution</h3>
+                      <ResponsiveContainer width="100%" height="90%">
+                        <BarChart data={srcData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
+                          <YAxis stroke="#6b7280" />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "8px",
+                            }}
+                          />
                           <Legend />
-                          <Line
-                            type="monotone"
-                            dataKey="totalLeads"
-                            stroke="#3b82f6"
-                            name="Total Leads"
-                            strokeWidth={3}
-                            dot={{ fill: "#3b82f6", r: 4 }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="convertedCount"
-                            stroke="#22c55e"
-                            name="Converted"
-                            strokeWidth={3}
-                            dot={{ fill: "#22c55e", r: 4 }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="growth"
-                            stroke="#ef4444"
-                            name="Growth %"
-                            strokeWidth={3}
-                            dot={{ fill: "#ef4444", r: 4 }}
-                          />
-                        </LineChart>
+                          <Bar dataKey="nbd" fill="#10b981" name="NBD" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="crr" fill="#f59e0b" name="CRR" radius={[4, 4, 0, 0]} />
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </TabsContent>
@@ -1622,12 +993,14 @@ export default function LeadAssignmentPage() {
           </CardContent>
         </Card>
 
+        {/* Leads Table with Real Data */}
         <Card>
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
             <CardTitle className="text-xl font-bold text-blue-900">
               Leads Requiring Assignment ({filteredLeads.length})
             </CardTitle>
           </CardHeader>
+
           <CardContent className="p-0">
             {filteredLeads.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -1711,43 +1084,70 @@ export default function LeadAssignmentPage() {
                         <TableHead className="font-semibold">Action</TableHead>
                       </TableRow>
                     </TableHeader>
+
                     <TableBody>
                       {currentLeads.map((lead, index) => (
                         <TableRow
-                          key={lead.id}
-                          className={`${lead.tatBreached ? "bg-red-50 hover:bg-red-100" : index % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-100"} transition-colors`}
+                          key={lead.id === "-" ? "-" + index : lead.id}
+                          className={`${lead.tatBreached
+                            ? "bg-red-50 hover:bg-red-100"
+                            : index % 2 === 0
+                              ? "bg-white hover:bg-slate-50"
+                              : "bg-slate-50/50 hover:bg-slate-100"
+                            } transition-colors`}
                         >
+                          {/* Date & Time */}
                           <TableCell className="whitespace-nowrap">
                             <div className="text-sm">
-                              <div className="font-medium">{new Date(lead.createdAt).toLocaleDateString()}</div>
+                              <div className="font-medium">
+                                {new Date(lead.updatedAt).toLocaleDateString("en-GB")}
+                              </div>
                               <div className="text-xs text-muted-foreground">
-                                {new Date(lead.createdAt).toLocaleTimeString()}
+                                {new Date(lead.updatedAt).toLocaleTimeString("en-GB", { hour12: false })}
                               </div>
                             </div>
                           </TableCell>
+
+                          {/* ID */}
                           <TableCell className="font-mono text-xs font-semibold text-blue-600">
-                            {lead.id.slice(-8)}
+                            {lead.id?.toString() || "N/A"}
                           </TableCell>
+
+                          {/* Name */}
                           <TableCell className="whitespace-nowrap">
-                            <div className="font-semibold text-slate-900">{lead.name}</div>
+                            <div className="font-semibold text-slate-900">{lead.name || "N/A"}</div>
                             {lead.tatBreached && (
                               <Badge variant="destructive" className="text-xs mt-1">
                                 TAT Breach
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap font-medium">{lead.phone}</TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.email}</TableCell>
+
+                          {/* Phone */}
+                          <TableCell className="whitespace-nowrap font-medium">{lead.phone || "N/A"}</TableCell>
+
+                          {/* Email */}
+                          <TableCell className="max-w-40">
+                            <div className="truncate" title={lead.email || "N/A"}>
+                              {lead.email || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Subject */}
                           <TableCell className="max-w-40">
                             <div className="truncate" title={lead.subject || "N/A"}>
                               {lead.subject || "N/A"}
                             </div>
                           </TableCell>
+
+                          {/* Notes */}
                           <TableCell className="max-w-40">
                             <div className="truncate" title={lead.notes || "N/A"}>
                               {lead.notes || "N/A"}
                             </div>
                           </TableCell>
+
+                          {/* IVR URL */}
                           <TableCell className="whitespace-nowrap">
                             {lead.ivrUrl ? (
                               <a
@@ -1762,24 +1162,56 @@ export default function LeadAssignmentPage() {
                               "N/A"
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.websiteName || "N/A"}</TableCell>
+
+                          {/* Website Name */}
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={lead.websiteName || "N/A"}>
+                              {lead.websiteName || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Data Source */}
                           <TableCell className="whitespace-nowrap">
                             <Badge variant="secondary" className="capitalize text-xs font-medium">
-                              {lead.source.replace("_", " ")}
+                              {lead.source?.replace("_", " ") || "N/A"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm">
-                            {lead.timestampTranscription || "N/A"}
+
+                          {/* Timestamp Transcription */}
+                          <TableCell className="max-w-40">
+                            <div className="truncate text-sm" title={lead.timestampTranscription || "N/A"}>
+                              {lead.timestampTranscription || "N/A"}
+                            </div>
                           </TableCell>
+
+                          {/* Lead Company */}
                           <TableCell className="whitespace-nowrap">
                             <Badge variant="outline" className="text-xs font-semibold">
-                              {lead.company}
+                              {lead.Company || "N/A"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.userName || "N/A"}</TableCell>
+
+                          {/* User Name */}
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={lead.userName || "N/A"}>
+                              {lead.userName || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* User Phone */}
                           <TableCell className="whitespace-nowrap">{lead.userPhone || "N/A"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.userEmail || "N/A"}</TableCell>
+
+                          {/* User Email */}
+                          <TableCell className="max-w-40">
+                            <div className="truncate" title={lead.userEmail || "N/A"}>
+                              {lead.userEmail || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Country */}
                           <TableCell className="whitespace-nowrap font-medium">{lead.country || "N/A"}</TableCell>
+
+                          {/* Priority */}
                           <TableCell className="whitespace-nowrap">
                             <Badge
                               className={
@@ -1790,36 +1222,66 @@ export default function LeadAssignmentPage() {
                                     : "bg-green-100 text-green-800 font-semibold"
                               }
                             >
-                              {lead.priority.toUpperCase()}
+                              {lead.priority?.toUpperCase() || "N/A"}
                             </Badge>
                           </TableCell>
+
+                          {/* Urgency */}
                           <TableCell className="whitespace-nowrap">
                             <Badge
-                              variant={lead.priority === "high" || lead.tatBreached ? "destructive" : "secondary"}
+                              variant={lead.urgency === "high" || lead.tatBreached ? "destructive" : "secondary"}
                               className="font-semibold"
                             >
-                              {lead.priority === "high" || lead.tatBreached ? "YES" : "NO"}
+                              {lead.urgency === "high" || lead.tatBreached ? "YES" : "NO"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.contactTime || "N/A"}</TableCell>
+
+                          {/* Contact Time */}
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={lead.contactTime || "N/A"}>
+                              {lead.contactTime || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Conversation Summary */}
                           <TableCell className="max-w-40">
                             <div className="truncate" title={lead.conversationSummary || "N/A"}>
                               {lead.conversationSummary || "N/A"}
                             </div>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.leadOutcome || "N/A"}</TableCell>
+
+                          {/* Lead Outcome */}
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={lead.leadOutcome || "N/A"}>
+                              {lead.leadOutcome || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Lead Category */}
                           <TableCell className="whitespace-nowrap">
                             <Badge variant="outline" className="font-medium">
                               {lead.leadCategory || "N/A"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{lead.preferredContact || "N/A"}</TableCell>
+
+                          {/* Preferred Contact */}
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={lead.preferredContact || "N/A"}>
+                              {lead.preferredContact || "N/A"}
+                            </div>
+                          </TableCell>
+
+                          {/* Assign To */}
                           <TableCell className="whitespace-nowrap">
                             <Badge variant="secondary" className="font-medium">
                               {lead.assignedTo || "Unassigned"}
                             </Badge>
                           </TableCell>
+
+                          {/* Last Call Done Date */}
                           <TableCell className="whitespace-nowrap text-sm">{lead.lastCallDate || "N/A"}</TableCell>
+
+                          {/* Last Disposition */}
                           <TableCell className="whitespace-nowrap">
                             <Badge
                               variant="outline"
@@ -1834,11 +1296,15 @@ export default function LeadAssignmentPage() {
                               {lead.lastDisposition || "N/A"}
                             </Badge>
                           </TableCell>
+
+                          {/* Last Remarks */}
                           <TableCell className="max-w-40">
                             <div className="truncate" title={lead.lastRemarks || "N/A"}>
                               {lead.lastRemarks || "N/A"}
                             </div>
                           </TableCell>
+
+                          {/* Call Recording URL */}
                           <TableCell className="whitespace-nowrap">
                             {lead.callRecordingUrl ? (
                               <a
@@ -1853,6 +1319,8 @@ export default function LeadAssignmentPage() {
                               "N/A"
                             )}
                           </TableCell>
+
+                          {/* Action */}
                           <TableCell className="whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <Button
@@ -1899,38 +1367,52 @@ export default function LeadAssignmentPage() {
                   </Table>
                 </div>
 
+                {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-6 py-4 border-t bg-slate-50">
                     <div className="text-sm text-muted-foreground">
-                      Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredLeads.length)} of{" "}
-                      {filteredLeads.length} leads
+                      Showing {startIndex + 1} to {Math.min(endIndex, filteredLeads.length)} of {filteredLeads.length} leads
                     </div>
+
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handlePageChange(currentPage - 1)}
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                         disabled={currentPage === 1}
                       >
                         Previous
                       </Button>
-                      <div className="flex gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handlePageChange(page)}
-                            className={currentPage === page ? "bg-blue-600 hover:bg-blue-700" : ""}
-                          >
-                            {page}
-                          </Button>
-                        ))}
+
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                          if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                            return (
+                              <Button
+                                key={page}
+                                variant={currentPage === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(page)}
+                                className={`w-10 ${currentPage === page ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                              >
+                                {page}
+                              </Button>
+                            )
+                          } else if (page === currentPage - 2 || page === currentPage + 2) {
+                            return (
+                              <span key={page} className="px-1">
+                                ...
+                              </span>
+                            )
+                          }
+                          return null
+                        })}
                       </div>
+
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handlePageChange(currentPage + 1)}
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                         disabled={currentPage === totalPages}
                       >
                         Next
@@ -1943,6 +1425,8 @@ export default function LeadAssignmentPage() {
           </CardContent>
         </Card>
 
+
+        {/* Dialogs - keeping all the new dialog UI */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
@@ -2178,8 +1662,11 @@ export default function LeadAssignmentPage() {
                 <CheckCircle className="h-6 w-6 text-green-600" />
                 SQV Verification Details
               </DialogTitle>
-              <DialogDescription>Squad Voice Quality verification information for the selected lead</DialogDescription>
+              <DialogDescription>
+                Squad Voice Quality verification information for the selected lead
+              </DialogDescription>
             </DialogHeader>
+
             {selectedLead && (
               <div className="grid gap-6 py-4">
                 <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
@@ -2215,7 +1702,9 @@ export default function LeadAssignmentPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">SQV ID</label>
                     <div className="bg-slate-100 p-3 rounded-lg border-2 border-slate-200">
-                      <p className="text-sm font-mono font-bold text-blue-600">{getSqvData(selectedLead.id).sqvId}</p>
+                      <p className="text-sm font-mono font-bold text-blue-600">
+                        {getSqvData(selectedLead.id).sqvId}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2229,6 +1718,7 @@ export default function LeadAssignmentPage() {
                   </div>
                 </div>
 
+                {/* ✅ Fixed Section */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">SQV RECORDING URL</label>
                   <div className="bg-slate-100 p-3 rounded-lg border-2 border-slate-200">
@@ -2256,7 +1746,9 @@ export default function LeadAssignmentPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">SQV AGENT NAME</label>
                     <div className="bg-slate-100 p-3 rounded-lg border-2 border-slate-200">
-                      <p className="text-sm font-semibold text-slate-900">{getSqvData(selectedLead.id).agentName}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {getSqvData(selectedLead.id).agentName}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2294,7 +1786,7 @@ export default function LeadAssignmentPage() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
-    </DashboardLayout>
+      </div >
+    </DashboardLayout >
   )
 }

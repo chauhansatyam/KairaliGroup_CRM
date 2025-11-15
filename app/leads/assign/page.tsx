@@ -71,22 +71,33 @@ export default function LeadAssignmentPage() {
   const [dataSourceSortField, setDataSourceSortField] = useState<string>("")
   const [dataSourceSortDirection, setDataSourceSortDirection] = useState<"asc" | "desc">("asc")
   const [dataSourceTableVisible, setDataSourceTableVisible] = useState(true)
+  const [isDataLoading, setIsDataLoading] = useState(true)
+  useEffect(() => {
+  // Check if both auth and leads data are loaded
+  if (!isLoading && leads.length >= 0) {
+    // Add a small delay to ensure smooth transition
+    const timer = setTimeout(() => {
+      setIsDataLoading(false)
+    }, 500)
+    return () => clearTimeout(timer)
+  }
+}, [isLoading, leads])
 
   const [selectedCompany, setSelectedCompany] = useState<string>("")
 
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [startDate, setStartDate] = useState(() => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    return firstDay.toISOString().split('T')[0]
-  })
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  return firstDay.toISOString().split('T')[0]
+})
 
-  const [endDate, setEndDate] = useState(() => {
-    const now = new Date()
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    return lastDay.toISOString().split('T')[0]
-  })
+const [endDate, setEndDate] = useState(() => {
+  const now = new Date()
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return lastDay.toISOString().split('T')[0]
+})
   const [dateError, setDateError] = useState("")
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -306,9 +317,36 @@ export default function LeadAssignmentPage() {
     return dataSourceSortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
   }
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
-  }
+  if (isLoading || isDataLoading) {
+  return (
+    <DashboardLayout>
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="relative">
+          {/* Spinner */}
+          <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          
+          {/* Inner pulse */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="w-12 h-12 bg-blue-600 rounded-full animate-pulse opacity-20"></div>
+          </div>
+        </div>
+        
+        {/* Loading text */}
+        <div className="mt-8 text-center">
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">Loading Dashboard</h3>
+          <p className="text-sm text-slate-500 animate-pulse">Fetching leads data for {selectedCompany}...</p>
+        </div>
+        
+        {/* Progress dots */}
+        <div className="flex gap-2 mt-6">
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+}
 
   if (!user || !hasPermission("leads.assign")) {
     return null
@@ -1003,253 +1041,256 @@ export default function LeadAssignmentPage() {
         </Card> */}
 
         {/* Data Source Breakdown Table with Real Data */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Data Source Breakdown - Total Unique Lead Received ({selectedCompany})</CardTitle>
-                <CardDescription>Analyze lead performance across different data sources</CardDescription>
+<Card>
+  <CardHeader>
+    <div className="flex items-center justify-between">
+      <div>
+        <CardTitle>Data Source Breakdown - Total Unique Lead Received ({selectedCompany})</CardTitle>
+        <CardDescription>Analyze lead performance across different data sources</CardDescription>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          variant={dataSourceView === "table" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setDataSourceView("table")}
+          className={dataSourceView === "table" ? "bg-blue-600 hover:bg-blue-700" : ""}
+        >
+          <TableIcon className="h-4 w-4 mr-2" />
+          Table
+        </Button>
+        <Button
+          variant={dataSourceView === "chart" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setDataSourceView("chart")}
+          className={dataSourceView === "chart" ? "bg-blue-600 hover:bg-blue-700" : ""}
+        >
+          <BarChart3 className="h-4 w-4 mr-2" />
+          Chart
+        </Button>
+      </div>
+    </div>
+  </CardHeader>
+  <CardContent>
+    {dataSourceView === "table" ? (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50">
+              <TableHead className="cursor-pointer font-semibold" onClick={() => handleDataSourceSort("dataSource")}>
+                <div className="flex items-center gap-2">
+                  Data Source
+                  {renderDataSourceSortIcon("dataSource")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("totalLeads")}>
+                <div className="flex items-center justify-center gap-2">
+                  Total Leads
+                  {renderDataSourceSortIcon("totalLeads")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("nbd")}>
+                <div className="flex items-center justify-center gap-2">
+                  NBD
+                  {renderDataSourceSortIcon("nbd")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("crr")}>
+                <div className="flex items-center justify-center gap-2">
+                  CRR
+                  {renderDataSourceSortIcon("crr")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("growth")}>
+                <div className="flex items-center justify-center gap-2">
+                  Growth
+                  {renderDataSourceSortIcon("growth")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("convertedCount")}>
+                <div className="flex items-center justify-center gap-2">
+                  Converted Count
+                  {renderDataSourceSortIcon("convertedCount")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("conversionAmount")}>
+                <div className="flex items-center justify-center gap-2">
+                  Conversion Amount
+                  {renderDataSourceSortIcon("conversionAmount")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("conversionPercentage")}>
+                <div className="flex items-center justify-center gap-2">
+                  Conversion %
+                  {renderDataSourceSortIcon("conversionPercentage")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("spendAmount")}>
+                <div className="flex items-center justify-center gap-2">
+                  Spend Amount
+                  {renderDataSourceSortIcon("spendAmount")}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("roas")}>
+                <div className="flex items-center justify-center gap-2">
+                  ROAS
+                  {renderDataSourceSortIcon("roas")}
+                </div>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {chartData.map((item, index) => {
+              const growthValue = parseFloat(item.growth)
+              const conversionPct = parseFloat(item.conversionPercentage)
+              
+              return (
+                <TableRow key={item.dataSource} className={index % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                  <TableCell className="font-medium">{item.dataSource}</TableCell>
+                  
+                  <TableCell className="text-center">
+                    <Badge variant="secondary" className="font-semibold">
+                      {item.totalLeads}
+                    </Badge>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <span className="text-blue-600 font-medium">
+                      {item.nbd}
+                    </span>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <span className="text-orange-600 font-medium">
+                      {item.crr}
+                    </span>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <div className={`flex items-center justify-center gap-1 font-medium ${
+                      growthValue > 0 ? "text-green-600" : growthValue < 0 ? "text-red-600" : "text-gray-600"
+                    }`}>
+                      {growthValue > 0 ? (
+                        <ArrowUp className="h-4 w-4" />
+                      ) : growthValue < 0 ? (
+                        <ArrowDown className="h-4 w-4" />
+                      ) : null}
+                      <span>{growthValue > 0 ? '+' : ''}{item.growth}%</span>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className="font-semibold bg-green-50 text-green-700 border-green-300">
+                      {item.convertedCount}
+                    </Badge>
+                  </TableCell>
+                  
+                  <TableCell className="text-center font-medium">
+                    ₹{Math.floor(item.conversionAmount).toLocaleString("en-IN")}
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center">
+                      <div className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                        conversionPct === 0 
+                          ? "bg-red-100 text-red-800 border border-red-300"
+                          : "bg-green-100 text-green-800 border border-green-300"
+                      }`}>
+                        {item.conversionPercentage}%
+                      </div>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell className="text-center font-medium text-blue-600">
+                    ₹{Math.floor(item.spendAmount).toLocaleString("en-IN")}
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <span className={`font-semibold ${
+                      parseFloat(item.roas) === 0 ? "text-red-600" : "text-green-600"
+                    }`}>
+                      {parseFloat(item.roas) === 0 ? "0x" : `${item.roas}x`}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    ) : (
+      <div className="space-y-4">
+        <Tabs defaultValue="leads" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-auto p-1 bg-muted/50">
+            <TabsTrigger
+              value="leads"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all px-4 py-3"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-xs font-medium">Total Leads</span>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={dataSourceView === "table" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setDataSourceView("table")}
-                  className={dataSourceView === "table" ? "bg-blue-600 hover:bg-blue-700" : ""}
-                >
-                  <TableIcon className="h-4 w-4 mr-2" />
-                  Table
-                </Button>
-                <Button
-                  variant={dataSourceView === "chart" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setDataSourceView("chart")}
-                  className={dataSourceView === "chart" ? "bg-blue-600 hover:bg-blue-700" : ""}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Chart
-                </Button>
+            </TabsTrigger>
+            <TabsTrigger
+              value="breakdown"
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-3"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs font-medium">NBD vs CRR</span>
               </div>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="leads" className="h-[600px] mt-6">
+            <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-blue-50 to-white">
+              <h3 className="text-sm font-semibold mb-3 text-blue-900">Lead Distribution by Source</h3>
+              <ResponsiveContainer width="100%" height="90%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                  <Bar dataKey="totalLeads" fill="#3b82f6" name="Total Leads" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </CardHeader>
-          <CardContent>
-            {dataSourceView === "table" ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50">
-                      <TableHead className="cursor-pointer font-semibold" onClick={() => handleDataSourceSort("dataSource")}>
-                        <div className="flex items-center gap-2">
-                          Data Source
-                          {renderDataSourceSortIcon("dataSource")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("totalLeads")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Total Leads
-                          {renderDataSourceSortIcon("totalLeads")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("nbd")}>
-                        <div className="flex items-center justify-center gap-2">
-                          NBD
-                          {renderDataSourceSortIcon("nbd")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("crr")}>
-                        <div className="flex items-center justify-center gap-2">
-                          CRR
-                          {renderDataSourceSortIcon("crr")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("growth")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Growth
-                          {renderDataSourceSortIcon("growth")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("convertedCount")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Converted Count
-                          {renderDataSourceSortIcon("convertedCount")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("conversionAmount")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Conversion Amount
-                          {renderDataSourceSortIcon("conversionAmount")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("conversionPercentage")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Conversion %
-                          {renderDataSourceSortIcon("conversionPercentage")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("spendAmount")}>
-                        <div className="flex items-center justify-center gap-2">
-                          Spend Amount
-                          {renderDataSourceSortIcon("spendAmount")}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer font-semibold text-center" onClick={() => handleDataSourceSort("roas")}>
-                        <div className="flex items-center justify-center gap-2">
-                          ROAS
-                          {renderDataSourceSortIcon("roas")}
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {chartData.map((item, index) => {
-                      const growthValue = parseFloat(item.growth)
-                      const conversionPct = parseFloat(item.conversionPercentage)
+          </TabsContent>
 
-                      return (
-                        <TableRow key={item.dataSource} className={index % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                          <TableCell className="font-medium">{item.dataSource}</TableCell>
-
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="font-semibold">
-                              {item.totalLeads}
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <span className="text-blue-600 font-medium">
-                              {item.nbd}
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <span className="text-orange-600 font-medium">
-                              {item.crr}
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <div className={`flex items-center justify-center gap-1 font-medium ${growthValue > 0 ? "text-green-600" : growthValue < 0 ? "text-red-600" : "text-gray-600"
-                              }`}>
-                              {growthValue > 0 ? (
-                                <ArrowUp className="h-4 w-4" />
-                              ) : growthValue < 0 ? (
-                                <ArrowDown className="h-4 w-4" />
-                              ) : null}
-                              <span>{growthValue > 0 ? '+' : ''}{item.growth}%</span>
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className="font-semibold bg-green-50 text-green-700 border-green-300">
-                              {item.convertedCount}
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-center font-medium">
-                            ₹{Math.floor(item.conversionAmount).toLocaleString("en-IN")}
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center">
-                              <div className={`rounded-full px-3 py-1 text-sm font-semibold ${conversionPct === 0
-                                  ? "bg-red-100 text-red-800 border border-red-300"
-                                  : "bg-green-100 text-green-800 border border-green-300"
-                                }`}>
-                                {item.conversionPercentage}%
-                              </div>
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="text-center font-medium text-blue-600">
-                            ₹{Math.floor(item.spendAmount).toLocaleString("en-IN")}
-                          </TableCell>
-
-                          <TableCell className="text-center">
-                            <span className={`font-semibold ${parseFloat(item.roas) === 0 ? "text-red-600" : "text-green-600"
-                              }`}>
-                              {parseFloat(item.roas) === 0 ? "0x" : `${item.roas}x`}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Tabs defaultValue="leads" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 h-auto p-1 bg-muted/50">
-                    <TabsTrigger
-                      value="leads"
-                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all px-4 py-3"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <BarChart3 className="h-4 w-4" />
-                        <span className="text-xs font-medium">Total Leads</span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="breakdown"
-                      className="data-[state=active]:bg-green-600 data-[state=active]:text-white transition-all px-4 py-3"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <TrendingUp className="h-4 w-4" />
-                        <span className="text-xs font-medium">NBD vs CRR</span>
-                      </div>
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="leads" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-blue-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-blue-900">Lead Distribution by Source</h3>
-                      <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
-                          <YAxis stroke="#6b7280" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "8px",
-                              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                            }}
-                          />
-                          <Legend wrapperStyle={{ paddingTop: "10px" }} />
-                          <Bar dataKey="totalLeads" fill="#3b82f6" name="Total Leads" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="breakdown" className="h-[600px] mt-6">
-                    <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-green-50 to-white">
-                      <h3 className="text-sm font-semibold mb-3 text-green-900">NBD vs CRR Distribution</h3>
-                      <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
-                          <YAxis stroke="#6b7280" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "8px",
-                            }}
-                          />
-                          <Legend />
-                          <Bar dataKey="nbd" fill="#10b981" name="NBD" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="crr" fill="#f59e0b" name="CRR" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <TabsContent value="breakdown" className="h-[600px] mt-6">
+            <div className="border rounded-lg p-4 h-full bg-gradient-to-br from-green-50 to-white">
+              <h3 className="text-sm font-semibold mb-3 text-green-900">NBD vs CRR Distribution</h3>
+              <ResponsiveContainer width="100%" height="90%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="dataSource" angle={-45} textAnchor="end" height={120} fontSize={11} />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="nbd" fill="#10b981" name="NBD" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="crr" fill="#f59e0b" name="CRR" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
         {/* Leads Table with Real Data */}
         <Card>

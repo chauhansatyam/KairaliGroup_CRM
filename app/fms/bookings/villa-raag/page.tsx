@@ -1650,5 +1650,6 @@ export default function VillaRaagBookingPage() {
         </div>
       </div>
     </div>
+    
   )
 }

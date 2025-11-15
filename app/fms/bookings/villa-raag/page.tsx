@@ -186,9 +186,11 @@ export default function VillaRaagBookingPage() {
    const tableRef = useRef<HTMLDivElement | null>(null)
   const { bookings, loading, error } = useActiveVillaBookings();
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [teamFilter, setTeamFilter] = useState<string>("all")
   const [dateFilter, setDateFilter] = useState<string>("all")
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
   const [sortField, setSortField] = useState<keyof Booking>("createdDate")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
@@ -217,10 +219,17 @@ export default function VillaRaagBookingPage() {
   const [currentPage, setCurrentPage] = useState<number>(1)
   const itemsPerPage = 10
 
+  // Debounce searchTerm to avoid re-filtering on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchTerm])
+
   const filterByDate = (booking: Booking) => {
     if (dateFilter === "all") return true
 
-    const bookingDate = new Date(booking.createdDate)
+    // Use checkIn date for date-based filters (more relevant for bookings)
+    const bookingDate = booking.checkIn ? new Date(booking.checkIn) : new Date(booking.createdDate)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -244,14 +253,17 @@ export default function VillaRaagBookingPage() {
   // Filter and sort logic
   const filteredBookings = bookings
     .filter((booking) => {
-      const matchesSearch =
-        booking.guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.bookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = statusFilter === "all" || booking.status === statusFilter
-      const matchesTeam = teamFilter === "all" || booking.team === teamFilter
+      const q = (debouncedSearchTerm ?? "").toLowerCase()
+      const guest = (booking.guestName ?? "").toLowerCase()
+      const bid = (booking.bookingId ?? "").toLowerCase()
+      const assigned = (booking.assignedTo ?? "").toLowerCase()
+
+      const matchesSearch = q === "" || guest.includes(q) || bid.includes(q) || assigned.includes(q)
+      const matchesStatus = statusFilter === "all" || (booking.status ?? "").toString() === statusFilter
+      const matchesTeam = teamFilter === "all" || (booking.team ?? "").toString() === teamFilter
       const matchesDate = filterByDate(booking)
-      return matchesSearch && matchesStatus && matchesTeam && matchesDate
+      const matchesSource = sourceFilter === "all" || (booking.source ?? "").toString() === sourceFilter
+      return matchesSearch && matchesStatus && matchesTeam && matchesDate && matchesSource
     })
     .sort((a, b) => {
       const aValue = a[sortField]
@@ -297,6 +309,30 @@ export default function VillaRaagBookingPage() {
   const pendingBookings = filteredBookings.filter((b) => b.status === "pending").length
   const totalAmount = filteredBookings.reduce((sum, booking) => sum + booking.amount, 0)
   const totalReceived = filteredBookings.reduce((sum, booking) => sum + booking.receivedAmount, 0)
+  
+  // Calculate cancelled bookings amount - from filtered bookings
+  const cancelledAmount = filteredBookings.reduce((sum, booking) => {
+    const status = (booking.status ?? "").toString().toLowerCase()
+    const accounts = (booking.accountsVerifyStatus ?? "").toString().toLowerCase()
+    const front = (booking.frontOfficeStatus ?? "").toString().toLowerCase()
+    const payment = (booking.paymentSettlementStatus ?? "").toString().toLowerCase()
+
+    const isCancelled = (
+      status === "canceled" ||
+      status === "cancelled" ||
+      accounts.includes("cancel") ||
+      front.includes("cancel") ||
+      payment.includes("cancel")
+    )
+    
+    return isCancelled ? sum + booking.amount : sum
+  }, 0)
+
+  // Debug log to verify cancelled amount calculation
+  if (cancelledAmount > 0) {
+    console.log("Cancelled bookings found - Total cancelled amount: ₹" + cancelledAmount.toLocaleString())
+    console.log("Cancelled bookings count:", cancelledBookings)
+  }
 
   const chartData = [
     { name: "Total", value: totalBookings, color: "#1e40af" },
@@ -321,6 +357,17 @@ export default function VillaRaagBookingPage() {
       setSortField(field)
       setSortDirection("asc")
     }
+  }
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setDebouncedSearchTerm("")
+    setStatusFilter("all")
+    setTeamFilter("all")
+    setDateFilter("all")
+    setSourceFilter("all")
+    setCustomDateRange({ start: "", end: "" })
+    setCurrentPage(1)
   }
 
   const SortIcon = ({ field }: { field: keyof Booking }) => {
@@ -514,7 +561,7 @@ export default function VillaRaagBookingPage() {
   // Watch search term and filters; debounce the scroll by 300ms to avoid jumping while typing.
   useEffect(() => {
     const hasActiveFilter =
-      (searchTerm && searchTerm.trim() !== "") || statusFilter !== "all" || teamFilter !== "all" || dateFilter !== "all"
+      (debouncedSearchTerm && debouncedSearchTerm.trim() !== "") || statusFilter !== "all" || teamFilter !== "all" || dateFilter !== "all"
 
     if (!hasActiveFilter) return
 
@@ -527,7 +574,40 @@ export default function VillaRaagBookingPage() {
     }, 300)
 
     return () => clearTimeout(t)
-  }, [searchTerm, statusFilter, teamFilter, dateFilter, filteredBookings.length])
+  }, [debouncedSearchTerm, statusFilter, teamFilter, dateFilter, filteredBookings.length])
+
+  // Show loading state while data is being fetched
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+            <p className="text-blue-600 font-semibold text-lg">Loading Villa Raag Bookings...</p>
+            <p className="text-slate-500 text-sm">Fetching booking data from server</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if data fetch failed
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full border border-red-200">
+          <div className="text-center">
+            <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Error Loading Bookings</h2>
+            <p className="text-slate-600 mb-4">{error || "Failed to load villa bookings. Please try again."}</p>
+            <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700">
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -551,6 +631,8 @@ export default function VillaRaagBookingPage() {
                   </p>
                 </div>
               </div>
+
+ 
             </div>
 
             <div className="flex items-center gap-3">
@@ -583,14 +665,14 @@ export default function VillaRaagBookingPage() {
                 </div>
                 Filters & Search
                 <div className="ml-auto flex items-center gap-2">
-                  <Badge className="bg-blue-200 text-blue-800 border-blue-300 font-semibold text-xs">
-                    Advanced Controls
-                  </Badge>
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="border-slate-200">
+                    Clear Filters
+                  </Button>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <div className="space-y-2 lg:col-span-2">
                   <Label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     <Search className="h-4 w-4 text-blue-700" />
@@ -636,10 +718,10 @@ export default function VillaRaagBookingPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="payment_pending">Payment Pending</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="confirmed">✓ Confirmed</SelectItem>
+                      <SelectItem value="pending">⏳ Pending</SelectItem>
+                      <SelectItem value="hold">⏸ Hold</SelectItem>
+                      <SelectItem value="canceled">✕ Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -657,6 +739,25 @@ export default function VillaRaagBookingPage() {
                       <SelectItem value="all">All Teams</SelectItem>
                       <SelectItem value="sales">Sales Team</SelectItem>
                       <SelectItem value="accounts">Accounts Team</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-blue-700" />
+                    Booking Source
+                  </Label>
+                  <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                    <SelectTrigger className="border-blue-300 focus:border-blue-500 focus:ring-blue-200 bg-white shadow-sm">
+                      <SelectValue placeholder="Filter by source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Total Bookings</SelectItem>
+                      <SelectItem value="Direct Booking">Offline Booking</SelectItem>
+                      <SelectItem value="Online Booking Engine">Online Booking</SelectItem>
+                      <SelectItem value="OTA">OTA Booking</SelectItem>
+                      <SelectItem value="Travel Agent">Travel Agents</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1014,7 +1115,7 @@ export default function VillaRaagBookingPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             <Card className="bg-gradient-to-br from-indigo-700 to-indigo-800 text-white border-indigo-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between">
@@ -1067,7 +1168,7 @@ export default function VillaRaagBookingPage() {
                       Pending Amount
                     </p>
                     <p className="text-xl lg:text-2xl xl:text-3xl font-bold">
-                      ₹{(totalAmount - totalReceived).toLocaleString()}
+                      ₹{(totalAmount - totalReceived - cancelledAmount).toLocaleString()}
                     </p>
                     <div className="flex items-center gap-1 lg:gap-2">
                       <div className="flex items-center gap-1 px-1.5 lg:px-2 py-0.5 lg:py-1 bg-white/20 rounded-full">
@@ -1078,6 +1179,28 @@ export default function VillaRaagBookingPage() {
                   </div>
                   <div className="p-2 lg:p-3 bg-white/20 rounded-xl flex-shrink-0 ml-2">
                     <Clock className="h-6 w-6 lg:h-8 lg:w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-red-700 to-red-800 text-white border-red-600 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 lg:space-y-2 min-w-0 flex-1">
+                    <p className="text-xs lg:text-sm font-medium uppercase tracking-wide truncate opacity-90">
+                      Cancelled Amount
+                    </p>
+                    <p className="text-xl lg:text-2xl xl:text-3xl font-bold">₹{cancelledAmount.toLocaleString()}</p>
+                    <div className="flex items-center gap-1 lg:gap-2">
+                      <div className="flex items-center gap-1 px-1.5 lg:px-2 py-0.5 lg:py-1 bg-white/20 rounded-full">
+                        <TrendingDown className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
+                        <span className="text-xs font-semibold">-Lost</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-3 bg-white/20 rounded-xl flex-shrink-0 ml-2">
+                    <XCircle className="h-6 w-6 lg:h-8 lg:w-8" />
                   </div>
                 </div>
               </CardContent>
@@ -1105,6 +1228,15 @@ export default function VillaRaagBookingPage() {
                 <Table>
                   <TableHeader className="bg-gradient-to-r from-blue-100 to-indigo-100">
                     <TableRow className="border-blue-300">
+                      <TableHead
+                        className="cursor-pointer font-bold text-slate-900 hover:text-blue-700 transition-colors"
+                        onClick={() => handleSort("createdDate")}
+                      >
+                        <div className="flex items-center gap-2">
+                          Booking Date
+                          <SortIcon field="createdDate" />
+                        </div>
+                      </TableHead>
                       <TableHead
                         className="cursor-pointer font-bold text-slate-900 hover:text-blue-700 transition-colors"
                         onClick={() => handleSort("bookingId")}
@@ -1146,6 +1278,7 @@ export default function VillaRaagBookingPage() {
                       </TableHead>
                       <TableHead className="font-bold text-slate-900">Payment Progress</TableHead>
                       <TableHead className="font-bold text-slate-900">Status</TableHead>
+                      <TableHead className="font-bold text-slate-900">Booking Source</TableHead>
                       <TableHead className="font-bold text-slate-900">Salesperson</TableHead>
                       <TableHead className="font-bold text-slate-900 text-center">Actions</TableHead>
                     </TableRow>
@@ -1156,6 +1289,9 @@ export default function VillaRaagBookingPage() {
                         key={booking.id}
                         className={`border-blue-100 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-blue-25"}`}
                       >
+                        <TableCell className="font-medium text-slate-700">
+                          {new Date(booking.createdDate).toLocaleDateString()}
+                        </TableCell>
                         <TableCell className="font-semibold text-blue-700">{booking.bookingId}</TableCell>
                         <TableCell className="font-medium text-slate-900">{booking.guestName}</TableCell>
                         <TableCell>
@@ -1205,6 +1341,11 @@ export default function VillaRaagBookingPage() {
                         <TableCell>
                           <Badge className={`${getStatusBadge(booking.status)} font-semibold`}>
                             {booking.status ? booking.status.replace("_", " ").toUpperCase() : "UNKNOWN"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-purple-100 text-purple-800 border-purple-300 font-semibold">
+                            {booking.source || "N/A"}
                           </Badge>
                         </TableCell>
                         <TableCell>

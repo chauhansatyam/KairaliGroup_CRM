@@ -73,12 +73,15 @@ export default function LeadAssignmentPage() {
   const [dataSourceTableVisible, setDataSourceTableVisible] = useState(true)
   const [isDataLoading, setIsDataLoading] = useState(true)
   useEffect(() => {
-  // Check if both auth and leads data are loaded
-  if (!isLoading && leads.length >= 0) {
-    // Add a small delay to ensure smooth transition
+  // Only stop loading when:
+  // 1. Auth is loaded (!isLoading)
+  // 2. Leads data exists (leads is defined and not null)
+  // 3. User has permission or is redirecting
+  if (!isLoading && leads !== undefined && leads !== null) {
+    // Small delay for smooth transition
     const timer = setTimeout(() => {
       setIsDataLoading(false)
-    }, 500)
+    }, 300)
     return () => clearTimeout(timer)
   }
 }, [isLoading, leads])
@@ -317,7 +320,8 @@ const [endDate, setEndDate] = useState(() => {
     return dataSourceSortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
   }
 
-  if (isLoading || isDataLoading) {
+  // Show loader if auth is loading OR data is loading OR leads is not yet loaded
+if (isLoading || isDataLoading || !leads) {
   return (
     <DashboardLayout>
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -334,7 +338,9 @@ const [endDate, setEndDate] = useState(() => {
         {/* Loading text */}
         <div className="mt-8 text-center">
           <h3 className="text-xl font-semibold text-slate-700 mb-2">Loading Dashboard</h3>
-          <p className="text-sm text-slate-500 animate-pulse">Fetching leads data for {selectedCompany}...</p>
+          <p className="text-sm text-slate-500 animate-pulse">
+            {!leads ? "Fetching leads data..." : `Loading data for ${selectedCompany}...`}
+          </p>
         </div>
         
         {/* Progress dots */}
